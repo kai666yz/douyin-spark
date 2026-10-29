@@ -2,6 +2,9 @@
 friends.json
 config.json
 following.json
+settings.json
+settings.json.bak
+_pool_edit.json
 spark_log.csv
 browser_profile*/
 wv_profile*/

@@ -72,7 +72,7 @@ namespace DouyinSpark
         static string scheduleTime = "";     // 每日定时 "HH:mm"
         static bool scheduleFired = false;   // 当天是否已触发
         static string scheduleLastDay = "";  // 上次触发的日期
-        const string AppVersion = "1.7.2";   // 当前版本（与 update/version.json 对比）
+        const string AppVersion = "1.8.3";   // 当前版本（与 update/version.json 对比）
 
         // HelloKitty 主题别名（Program 内直接使用）
         static readonly Color KPink = KittyTheme.KPink;
@@ -318,12 +318,20 @@ namespace DouyinSpark
                 sideBtns.Controls.Add(b);
             };
 
-            addSideBtn("预览句子", delegate { DoDry(); });
-            addSideBtn("添加好友", delegate { AddFriend(); });
-            addSideBtn("导入关注", delegate { ImportFollowing(); });
-            addSideBtn("登录自检", delegate { DoLogin(); });
-            addSideBtn("抖音消息", delegate { OpenMessages(); });
-            addSideBtn("换肤", delegate
+            // 添加好友 = 一键导入抖音关注列表（可勾选添加），替代手动粘贴
+            addSideBtn("添加好友", delegate { ImportFollowing(); });
+            addSideBtn("好友状态", delegate { ShowFriendStatus(); });
+            addSideBtn("语录管理", delegate { ShowSentenceManager(); });
+            // 更多功能：收进下拉菜单
+            var moreMenu = new ContextMenuStrip();
+            moreMenu.Items.Add("预览句子", null, delegate { DoDry(); });
+            moreMenu.Items.Add("管理好友", null, delegate { AddFriend(); });
+            moreMenu.Items.Add("登录自检", null, delegate { DoLogin(); });
+            moreMenu.Items.Add("抖音消息", null, delegate { OpenMessages(); });
+            moreMenu.Items.Add("定时设置", null, delegate { ShowScheduleDialog(); });
+            moreMenu.Items.Add("开机自启", null, delegate { ToggleAutostart(); });
+            moreMenu.Items.Add("浏览器选择", null, delegate { ShowBrowserDialog(); });
+            moreMenu.Items.Add("换肤", null, delegate
             {
                 var cd = new ColorDialog();
                 cd.Color = form.BackColor;
@@ -334,32 +342,25 @@ namespace DouyinSpark
                     Color fg = dark ? Color.White : Color.FromArgb(30, 30, 40);
                     Color sub = dark ? ControlPaint.Dark(bg, 0.15f) : ControlPaint.Light(bg, 0.15f);
                     Color box = dark ? ControlPaint.Dark(bg, 0.3f) : ControlPaint.Light(bg, 0.1f);
-                    form.BackColor = bg;
-                    sidebar.BackColor = sub;
-                    content.BackColor = bg;
-                    txtLog.BackColor = box;
-                    txtLog.ForeColor = dark ? Color.FromArgb(200, 220, 210) : Color.FromArgb(40, 40, 50);
-                    dgv.BackgroundColor = box;
-                    dgv.DefaultCellStyle.BackColor = box;
-                    dgv.DefaultCellStyle.ForeColor = fg;
+                    form.BackColor = bg; sidebar.BackColor = sub; content.BackColor = bg;
+                    txtLog.BackColor = box; txtLog.ForeColor = dark ? Color.FromArgb(200, 220, 210) : Color.FromArgb(40, 40, 50);
+                    dgv.BackgroundColor = box; dgv.DefaultCellStyle.BackColor = box; dgv.DefaultCellStyle.ForeColor = fg;
                     dgv.RowsDefaultCellStyle.BackColor = box;
                     dgv.AlternatingRowsDefaultCellStyle.BackColor = dark ? ControlPaint.Light(box, 0.15f) : ControlPaint.Dark(box, 0.08f);
-                    dgv.ColumnHeadersDefaultCellStyle.BackColor = sub;
-                    dgv.ColumnHeadersDefaultCellStyle.ForeColor = fg;
-                    lblLogo.ForeColor = fg;
-                    lblStatus.BackColor = sub;
-                    form.Invalidate();
+                    dgv.ColumnHeadersDefaultCellStyle.BackColor = sub; dgv.ColumnHeadersDefaultCellStyle.ForeColor = fg;
+                    lblLogo.ForeColor = fg; lblStatus.BackColor = sub; form.Invalidate();
                 }
             });
-            addSideBtn("启动游戏", delegate
+            moreMenu.Items.Add("启动游戏(Steam)", null, delegate
             {
                 try { Process.Start("steam://rungameid/431960"); Log("已启动 Steam 游戏"); }
                 catch (Exception ex) { Log("启动失败: " + ex.Message); }
             });
-            addSideBtn("定时", delegate { ShowScheduleDialog(); });
-            addSideBtn("自启", delegate { ToggleAutostart(); });
-            addSideBtn("浏览器", delegate { ShowBrowserDialog(); });
-            addSideBtn("好友状态", delegate { ShowFriendStatus(); });
+            addSideBtn("更多功能", delegate (object s, EventArgs e)
+            {
+                var btn = s as Control;
+                if (btn != null) moreMenu.Show(btn, new Point(0, btn.Height));
+            });
             addSideBtn("检查更新", delegate { DoCheckUpdate(); });
 
             lblStatus = new Label();
@@ -710,7 +711,12 @@ namespace DouyinSpark
                 string zipName = GetJsonField(j, "zip");
                 string note = GetJsonField(j, "note");
                 if (newVer.Length == 0 || zipName.Length == 0) { Log("更新源格式不正确"); return; }
-                if (CompareVersion(newVer, AppVersion) <= 0) { Log("已是最新版本 v" + AppVersion); return; }
+                if (CompareVersion(newVer, AppVersion) <= 0)
+                {
+                    Log("已是最新版本 v" + AppVersion);
+                    MessageBox.Show("当前已是最新版本 v" + AppVersion + "\n\n本版更新说明：\n" + note, "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
                 string zipPath = Path.Combine(updDir, zipName);
                 if (!File.Exists(zipPath)) { Log("找不到更新包: " + zipName); return; }
                 if (MessageBox.Show("发现新版本 v" + newVer + "（当前 v" + AppVersion + "）\n更新说明：" + note +
@@ -799,15 +805,40 @@ namespace DouyinSpark
         {
             string line = DateTime.Now.ToString("HH:mm:ss") + "  " + msg + "\n";
             try { File.AppendAllText(Path.Combine(BaseDir, "logs", "app_log.txt"), line); } catch { }
-            txtLog.AppendText(line);
-            txtLog.SelectionStart = txtLog.TextLength; txtLog.ScrollToCaret();
-            // 日志上限：防止长时间运行内存膨胀
-            if (txtLog.Lines.Length > 600)
+            // 线程安全：后台线程不得直接碰 WinForms 控件（RichTextBox 跨线程必崩）
+            try
             {
-                int idx = txtLog.GetFirstCharIndexFromLine(150);
-                if (idx > 0) { txtLog.Select(0, idx); txtLog.SelectedText = ""; }
+                if (mainForm != null && mainForm.IsHandleCreated && !mainForm.IsDisposed)
+                {
+                    if (mainForm.InvokeRequired)
+                    {
+                        mainForm.BeginInvoke((Action)delegate { LogUi(msg); });
+                    }
+                    else LogUi(msg);
+                }
             }
-            lblStatus.Text = msg;
+            catch { }
+        }
+
+        static void LogUi(string msg)
+        {
+            if (txtLog == null || txtLog.IsDisposed) return;
+            try
+            {
+                txtLog.AppendText(msg + "\n");
+                txtLog.SelectionStart = txtLog.TextLength; txtLog.ScrollToCaret();
+                if (txtLog.Lines.Length > 600)
+                {
+                    int idx = txtLog.GetFirstCharIndexFromLine(150);
+                    if (idx > 0) { txtLog.Select(0, idx); txtLog.SelectedText = ""; }
+                }
+            }
+            catch { }
+            try
+            {
+                if (lblStatus != null && !lblStatus.IsDisposed) lblStatus.Text = msg;
+            }
+            catch { }
         }
 
         static bool LogHasTodayOk()
@@ -971,7 +1002,13 @@ namespace DouyinSpark
                     Log("完成，退出码 " + p.ExitCode);
                     try { progress.Invoke(new Action(delegate { progress.MarkFinished(); progress.Info = "\u2713 本轮发送完成"; })); } catch { }
                     try { btnStart.Invoke(new Action(delegate { btnStart.Enabled = true; })); } catch { }
-                    try { LoadLogs(); } catch { }
+                    // LoadLogs 操作 dgv 控件，必须在 UI 线程执行
+                    try
+                    {
+                        if (mainForm != null && mainForm.IsHandleCreated && !mainForm.IsDisposed)
+                            mainForm.BeginInvoke((Action)delegate { LoadLogs(); });
+                    }
+                    catch { }
                 };
                 p.Start(); p.BeginOutputReadLine(); p.BeginErrorReadLine();
                 Log("已启动，日志文件: logs/run_out.txt");
@@ -1038,7 +1075,13 @@ namespace DouyinSpark
                 else if (outp.Contains("Traceback") || outp.Length == 0) result = "检查异常（详见日志）";
                 else result = "浏览器检查完成（详见日志）";
                 Log("登录状态: " + result);
-                MessageBox.Show("登录状态：" + result, "登录状态");
+                // 弹窗回 UI 线程，避免后台线程阻塞进程退出
+                try
+                {
+                    if (mainForm != null && mainForm.IsHandleCreated && !mainForm.IsDisposed)
+                        mainForm.BeginInvoke((Action)delegate { MessageBox.Show("登录状态：" + result, "登录状态"); });
+                }
+                catch { }
             });
             th.IsBackground = true; th.Start();
         }
@@ -1321,13 +1364,148 @@ namespace DouyinSpark
                             }
                             catch { }
                         }
-                        MessageBox.Show("短链解析完成，已添加 " + got.Count + " 位好友", "管理好友");
+                        try
+                        {
+                            if (mainForm != null && mainForm.IsHandleCreated && !mainForm.IsDisposed)
+                                mainForm.BeginInvoke((Action)delegate { MessageBox.Show("短链解析完成，已添加 " + got.Count + " 位好友", "管理好友"); });
+                        }
+                        catch { }
                     });
                     th.IsBackground = true; th.Start();
                 }
             };
             dlg.Controls.AddRange(new Control[] { l0, cb, bDel, sep, lTip, l1, t1, l2, t2, l3, lblClip, b });
             dlg.ShowDialog();
+        }
+
+        // 语录管理：勾选启用分类 + 编辑自定义语录
+        static void ShowSentenceManager()
+        {
+            try
+            {
+                var poolPath = Path.Combine(BaseDir, "sentences_pool.json");
+                string raw = File.ReadAllText(poolPath, System.Text.Encoding.UTF8);
+                var dlg = new Form();
+                dlg.Text = "语录管理"; dlg.Size = new Size(560, 620);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.BackColor = Color.White;
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.MaximizeBox = false; dlg.MinimizeBox = false;
+
+                var l1 = new Label();
+                l1.Text = "勾选要使用的语录分类：";
+                l1.Location = new Point(15, 12); l1.AutoSize = true;
+                l1.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
+                l1.ForeColor = KPinkDeep;
+
+                // 解析分类
+                var catChecks = new System.Collections.Generic.List<CheckBox>();
+                // 简单正则提取分类名和 active_categories
+                var activeSet = new System.Collections.Generic.HashSet<string>();
+                foreach (Match m in Regex.Matches(raw, "\"active_categories\"\\s*:\\s*\\[([^\\]]*)\\]"))
+                {
+                    foreach (Match q in Regex.Matches(m.Groups[1].Value, "\"([^\"]+)\""))
+                        activeSet.Add(q.Groups[1].Value);
+                }
+                var catNames = new System.Collections.Generic.List<string>();
+                foreach (Match m in Regex.Matches(raw, "\"categories\"\\s*:\\s*\\{([\\s\\S]*?)\\}\\s*,\\s*\"active_categories\""))
+                {
+                    foreach (Match q in Regex.Matches(m.Groups[1].Value, "\"([^\"]+)\"\\s*:\\s*\\["))
+                        catNames.Add(q.Groups[1].Value);
+                }
+                int y = 42;
+                foreach (var cat in catNames)
+                {
+                    var cb = new CheckBox();
+                    cb.Text = cat;
+                    cb.Location = new Point(20, y); cb.AutoSize = true;
+                    cb.Font = new Font("Microsoft YaHei UI", 9.5F);
+                    cb.ForeColor = KPinkDeep;
+                    cb.Checked = activeSet.Contains(cat);
+                    catChecks.Add(cb);
+                    dlg.Controls.Add(cb);
+                    y += 28;
+                }
+
+                var l2 = new Label();
+                l2.Text = "自定义语录（每行一句，保存后归入「自定义」分类）：";
+                l2.Location = new Point(15, y + 8); l2.AutoSize = true;
+                l2.Font = new Font("Microsoft YaHei UI", 9.5F);
+                l2.ForeColor = KPinkDeep;
+                dlg.Controls.Add(l2);
+
+                var txtCustom = new TextBox();
+                txtCustom.Multiline = true;
+                txtCustom.ScrollBars = ScrollBars.Vertical;
+                txtCustom.Location = new Point(15, y + 36);
+                txtCustom.Size = new Size(510, 320);
+                txtCustom.Font = new Font("Microsoft YaHei UI", 9.5F);
+                txtCustom.AcceptsReturn = true;
+                // 读现有自定义句
+                Match customMatch = Regex.Match(raw, "\"自定义\"\\s*:\\s*\\[([^\\]]*)\\]");
+                if (customMatch.Success)
+                {
+                    var lines = new System.Collections.Generic.List<string>();
+                    foreach (Match q in Regex.Matches(customMatch.Groups[1].Value, "\"((?:[^\"\\\\]|\\\\.)*)\""))
+                        lines.Add(q.Groups[1].Value);
+                    txtCustom.Text = string.Join("\r\n", lines);
+                }
+                dlg.Controls.Add(txtCustom);
+
+                var btnSave = new RoundButton();
+                btnSave.Text = "保存";
+                btnSave.Size = new Size(120, 36);
+                btnSave.Location = new Point(15, y + 365);
+                btnSave.MainColor = KPink; btnSave.HoverColor = Color.FromArgb(255, 150, 195);
+                btnSave.ForeColor = Color.White;
+                btnSave.Click += delegate
+                {
+                    try
+                    {
+                        // 重写 active_categories
+                        var actives = new System.Collections.Generic.List<string>();
+                        foreach (var cb in catChecks) if (cb.Checked) actives.Add(cb.Text);
+                        // 自定义句拆行
+                        var customLines = new System.Collections.Generic.List<string>();
+                        foreach (var ln in txtCustom.Text.Split('\n'))
+                        {
+                            var s = ln.Trim();
+                            if (s.Length > 0) customLines.Add(s);
+                        }
+                        // 用 Python 重新写 json（避免正则转义地狱）
+                        var tmp = Path.Combine(BaseDir, "_pool_edit.json");
+                        File.WriteAllText(tmp, raw, new System.Text.UTF8Encoding(false));
+                        var ps = new ProcessStartInfo();
+                        ps.FileName = PyExe;
+                        ps.Arguments = "-c \"import json,sys; p=r'\"" + tmp.Replace("\\", "\\\\") + "'; d=json.load(open(p,encoding='utf-8')); d['active_categories']=" + JsonList(actives) + "; d.setdefault('categories',{})['自定义']=" + JsonList(customLines) + "; json.dump(d,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)\"";
+                        ps.UseShellExecute = false; ps.CreateNoWindow = true;
+                        using (var pr = Process.Start(ps)) { pr.WaitForExit(5000); }
+                        File.Copy(tmp, poolPath, true);
+                        try { File.Delete(tmp); } catch { }
+                        Log("语录配置已保存：启用 " + actives.Count + " 个分类，自定义 " + customLines.Count + " 句");
+                        MessageBox.Show("已保存！下次发送生效。", "语录管理");
+                        dlg.Close();
+                    }
+                    catch (Exception ex) { MessageBox.Show("保存失败: " + ex.Message); }
+                };
+                dlg.Controls.Add(btnSave);
+
+                dlg.ShowDialog();
+            }
+            catch (Exception ex) { Log("语录管理打开失败: " + ex.Message); }
+        }
+
+        static string JsonList(System.Collections.Generic.List<string> items)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append("[");
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (i > 0) sb.Append(",");
+                sb.Append("\"" + items[i].Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"");
+            }
+            sb.Append("]");
+            return sb.ToString();
         }
 
         // 一键导入：自动抓取抖音全部关注对象 → 勾选窗口 → 批量加入
@@ -1412,14 +1590,21 @@ namespace DouyinSpark
                 {
                     string ff = Path.Combine(BaseDir, "friends.json");
                     string c = File.ReadAllText(ff, System.Text.Encoding.UTF8).TrimEnd();
+                    // 保护：文件空/非数组时重建，而不是用 Substring 猜末尾
+                    if (!c.StartsWith("[") || !c.EndsWith("]") || c.Length < 2)
+                    {
+                        File.WriteAllText(ff, "[]", new System.Text.UTF8Encoding(false));
+                        c = "[]";
+                    }
                     var sb = new System.Text.StringBuilder(c.Substring(0, c.Length - 1).TrimEnd());
+                    if (sb.Length > 1) sb.Append(",");
                     int n = 0;
                     foreach (var it in toAdd)
                     {
                         string uid = it[1].Replace("https://www.douyin.com/user/", "");
                         if (exist.Contains(uid)) continue;
                         string nm = string.IsNullOrEmpty(it[0]) ? "抖音好友" : it[0];
-                        sb.Append(",\n  {\"name\": \"" + nm.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\", \"url\": \"" + it[1] + "\"}");
+                        sb.Append("\n  {\"name\": \"" + nm.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\", \"url\": \"" + it[1] + "\"}");
                         exist.Add(uid); n++;
                     }
                     sb.Append("\n]");

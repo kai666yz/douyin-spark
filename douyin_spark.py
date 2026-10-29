@@ -92,9 +92,19 @@ def load_json(p):
         return json.load(f)
 
 def pick_sentences(n=23, avoid_days=7, on_date=None):
-    """抽句子：当天有节日主题则优先用节日句，不足补常规句"""
+    """抽句子：按启用的分类抽，当天有节日主题则优先用节日句"""
     pool = load_json(POOL_FILE)
-    sentences = pool["sentences"]
+    # 兼容旧格式：无 categories 时用 sentences
+    cats = pool.get("categories", {})
+    active = pool.get("active_categories", [])
+    if cats and active:
+        sentences = []
+        for c in active:
+            sentences.extend(cats.get(c, []))
+        if not sentences:
+            sentences = pool.get("sentences", [])
+    else:
+        sentences = pool.get("sentences", [])
     holiday = pool.get("holiday", {})
     d = on_date or datetime.now()
     today_key = d.strftime("%m-%d")
