@@ -334,7 +334,7 @@ def main():
         raise ValueError("好友名单必须是 JSON 数组，原文件未修改")
     valid = []
     for friend in friends:
-        if (isinstance(friend, dict) and isinstance(friend.get('name'), str)
+        if (isinstance(friend, dict) and friend.get('kind') != 'group' and isinstance(friend.get('name'), str)
                 and isinstance(friend.get('url'), str)
                 and re.fullmatch(r'https://www\.douyin\.com/user/[A-Za-z0-9_-]+/?', friend['url'])):
             valid.append(friend)

@@ -93,10 +93,10 @@ namespace DouyinSpark
             bool icon=IconName.Length>0;
             if(icon)
             {
-                int x=Navigation?18:Primary?(Width/2-52):12;
+                int x=Navigation||Primary?18:12;
                 LineIcons.Draw(g,IconName,new Rectangle(x,(Height-20)/2+shift-1,20,20),foreground);
             }
-            var textBox=Navigation?new Rectangle(48,shift,Width-54,Height-4):icon?new Rectangle(Primary?26:32,shift,Width-(Primary?40:38),Height-4):new Rectangle(0,shift,Width,Height-4);
+            var textBox=Navigation?new Rectangle(48,shift,Width-54,Height-4):icon?new Rectangle(Primary?48:32,shift,Width-(Primary?54:38),Height-4):new Rectangle(0,shift,Width,Height-4);
             TextRenderer.DrawText(g,Text,Font,textBox,foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|(Navigation?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter));
             if(Focused)using(var path=AppPalette.Round(new RectangleF(2,2,Width-5,Height-6),CornerRadius))using(var pen=new Pen(AppPalette.Accent,1))g.DrawPath(pen,path);
         }

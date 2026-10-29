@@ -9,6 +9,10 @@ spark_log.csv
 browser_profile*/
 wv_profile*/
 ui_profile*/
+conversation_profile*/
+conversations.json
+conversation_candidates.json
+vendor/
 logs/
 *.log
 run_out.txt

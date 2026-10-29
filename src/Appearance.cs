@@ -9,16 +9,16 @@ namespace DouyinSpark
     static class AppPalette
     {
         public static bool Dark;
-        public static Color Canvas {get{return Dark?Color.FromArgb(33,30,34):Color.FromArgb(255,247,249);}}
-        public static Color Sidebar {get{return Dark?Color.FromArgb(40,35,41):Color.FromArgb(249,244,244);}}
-        public static Color Surface {get{return Dark?Color.FromArgb(47,42,48):Color.White;}}
-        public static Color Soft {get{return Dark?Color.FromArgb(65,49,59):Color.FromArgb(248,234,239);}}
-        public static Color Stripe {get{return Dark?Color.FromArgb(51,46,52):Color.FromArgb(252,249,250);}}
-        public static Color Accent {get{return Dark?Color.FromArgb(213,161,178):Color.FromArgb(164,94,118);}}
-        public static Color AccentDeep {get{return Dark?Color.FromArgb(237,192,207):Color.FromArgb(144,78,101);}}
-        public static Color Text {get{return Dark?Color.FromArgb(243,234,238):Color.FromArgb(58,46,51);}}
-        public static Color Muted {get{return Dark?Color.FromArgb(190,170,181):Color.FromArgb(138,112,120);}}
-        public static Color Border {get{return Dark?Color.FromArgb(71,61,70):Color.FromArgb(238,227,231);}}
+        public static Color Canvas {get{return Dark?Color.FromArgb(28,32,39):Color.FromArgb(244,246,249);}}
+        public static Color Sidebar {get{return Dark?Color.FromArgb(33,38,47):Color.FromArgb(232,236,243);}}
+        public static Color Surface {get{return Dark?Color.FromArgb(39,44,53):Color.White;}}
+        public static Color Soft {get{return Dark?Color.FromArgb(46,59,78):Color.FromArgb(233,239,250);}}
+        public static Color Stripe {get{return Dark?Color.FromArgb(44,50,61):Color.FromArgb(248,250,253);}}
+        public static Color Accent {get{return Dark?Color.FromArgb(146,177,226):Color.FromArgb(77,113,182);}}
+        public static Color AccentDeep {get{return Dark?Color.FromArgb(177,200,237):Color.FromArgb(58,90,154);}}
+        public static Color Text {get{return Dark?Color.FromArgb(234,238,244):Color.FromArgb(34,44,59);}}
+        public static Color Muted {get{return Dark?Color.FromArgb(164,177,195):Color.FromArgb(106,118,138);}}
+        public static Color Border {get{return Dark?Color.FromArgb(62,70,84):Color.FromArgb(226,231,238);}}
         public static Color Success {get{return Dark?Color.FromArgb(145,180,157):Color.FromArgb(70,119,86);}}
         public static Color SuccessSoft {get{return Dark?Color.FromArgb(47,70,57):Color.FromArgb(222,240,228);}}
         public static Color SuccessBar {get{return Color.FromArgb(168,216,185);}}
@@ -40,12 +40,12 @@ namespace DouyinSpark
             bool own=root is OverviewCard || root is CardSurface || root is EmptyHistory || root is RoundButton || root is SparkProgress;
             if(root is Form) {root.BackColor=Canvas;root.ForeColor=Text;WindowChrome.Apply((Form)root);}
             else if(root is Label) {root.ForeColor=Convert.ToString(root.Tag)=="muted"?Muted:Text;root.BackColor=Color.Transparent;}
-            else if(root is TextBoxBase || root is ListBox) {root.BackColor=Surface;root.ForeColor=Text;}
+            else if(root is TextBoxBase || root is ListBox) {root.BackColor=root is SearchInput?Soft:Surface;root.ForeColor=Text;}
             else if(root is DataGridView) StyleGrid((DataGridView)root);
             else if(root is CheckBox || root is RadioButton) {root.ForeColor=Text;root.BackColor=Color.Transparent;}
             else if(root is Button && !own) {var b=(Button)root;b.FlatStyle=FlatStyle.Flat;b.FlatAppearance.BorderColor=Border;b.BackColor=Soft;b.ForeColor=Text;}
             else if(root is Panel || root is TableLayoutPanel || root is FlowLayoutPanel)
-                root.BackColor=Convert.ToString(root.Tag)=="sidebar"?Sidebar:Convert.ToString(root.Tag)=="canvas"?Canvas:Surface;
+                root.BackColor=Convert.ToString(root.Tag)=="sidebar"?Sidebar:Convert.ToString(root.Tag)=="canvas"?Canvas:Convert.ToString(root.Tag)=="soft"?Soft:Surface;
             if(root is CardSurface) root.BackColor=Canvas;
             if(root is OverviewCard || root is SparkProgress) root.BackColor=Canvas;
             if(root is EmptyHistory) root.BackColor=Surface;
@@ -57,6 +57,7 @@ namespace DouyinSpark
             grid.BackgroundColor=Surface;grid.BorderStyle=BorderStyle.None;grid.CellBorderStyle=DataGridViewCellBorderStyle.None;
             grid.ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.None;grid.RowHeadersVisible=false;grid.EnableHeadersVisualStyles=false;
             grid.ColumnHeadersHeight=38;grid.ColumnHeadersDefaultCellStyle.BackColor=Soft;grid.ColumnHeadersDefaultCellStyle.ForeColor=Text;
+            grid.ColumnHeadersDefaultCellStyle.WrapMode=DataGridViewTriState.False;
             grid.ColumnHeadersDefaultCellStyle.Font=Font(9,true);grid.ColumnHeadersDefaultCellStyle.Padding=new Padding(12,0,0,0);
             grid.DefaultCellStyle.BackColor=Surface;grid.DefaultCellStyle.ForeColor=Text;grid.DefaultCellStyle.SelectionBackColor=Soft;grid.DefaultCellStyle.SelectionForeColor=Text;
             grid.DefaultCellStyle.Font=Font(9);grid.DefaultCellStyle.Padding=new Padding(12,0,0,0);

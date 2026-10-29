@@ -51,6 +51,14 @@ class BackendTests(unittest.TestCase):
         self.assertIn('[待补主页]',r.stdout)
         self.assertEqual(r.stdout.count(' -> fixed'),2)
 
+    def test_groups_are_excluded_even_with_a_profile_url(self):
+        group = {'name': 'group_must_not_send', 'url': 'https://www.douyin.com/user/qa_group', 'kind': 'group'}
+        (self.root/'friends.json').write_text(json.dumps(self.friends+[group]), encoding='utf-8')
+        r = self.run_cli('--dry-run', '--message', 'fixed')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.count(' -> fixed'), 2)
+        self.assertNotIn('group_must_not_send                ->', r.stdout)
+
     def test_empty_message_rejected(self):
         self.assertNotEqual(self.run_cli('--dry-run','--message',' ').returncode,0)
 

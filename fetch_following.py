@@ -197,7 +197,7 @@ def main(result_path=None, cancel_file=None):
     except Exception as exc:
         text = str(exc)
         if 'executable doesn' in text.lower():
-            message = '未找到所选浏览器。请安装 Edge/Chrome，或在“更多功能 → 浏览器选择”中切换。'
+            message = '未找到所选浏览器。请安装 Edge/Chrome，或在“设置与更多 → 传统发送浏览器”中切换。'
         elif 'ProcessSingleton' in text or 'SingletonLock' in text or 'user data directory is already in use' in text:
             message = '软件专用浏览器正被占用。请关闭软件打开的私信/登录窗口，稍后重试。'
         elif 'closed' in text.lower():

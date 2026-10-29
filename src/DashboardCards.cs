@@ -10,11 +10,12 @@ namespace DouyinSpark
         public TodaySummary Summary=new TodaySummary();
         public string NextText="未设置定时", ModeText="分类语录";
         public RoundButton StartButton;
+        public bool Compact;
         public OverviewCard(){DoubleBuffered=true;BackColor=AppPalette.Canvas;SetStyle(ControlStyles.ResizeRedraw,true);}
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            if(StartButton!=null) StartButton.SetBounds(Width-212,65,188,56);
+            if(StartButton!=null) {if(Compact)StartButton.SetBounds(Width-170,49,150,48);else StartButton.SetBounds(Width-212,65,188,56);}
         }
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -22,6 +23,7 @@ namespace DouyinSpark
             using(var path=AppPalette.Round(new RectangleF(.5f,.5f,Width-1,Height-1),16))
             using(var surface=new SolidBrush(AppPalette.Surface))
             using(var border=new Pen(AppPalette.Border)){g.FillPath(surface,path);g.DrawPath(border,path);}
+            if(Compact){PaintCompact(g);return;}
             using(var text=new SolidBrush(AppPalette.Text))
             using(var muted=new SolidBrush(AppPalette.Muted))
             using(var title=AppPalette.Font(10,true))
@@ -43,6 +45,19 @@ namespace DouyinSpark
                 right.Dispose();
             }
         }
+        void PaintCompact(Graphics g)
+        {
+            using(var text=new SolidBrush(AppPalette.Text))using(var muted=new SolidBrush(AppPalette.Muted))
+            using(var title=AppPalette.Font(10,true))using(var large=AppPalette.Font(27,true))using(var small=AppPalette.Font(8.5f)){
+                g.DrawString("今日概览",title,text,18,15);
+                g.DrawString(NextText,small,muted,new RectangleF(120,17,Math.Max(80,Width-140),22),new StringFormat {Alignment=StringAlignment.Far,Trimming=StringTrimming.EllipsisCharacter});
+                g.DrawString(Summary.Processed+" / "+Summary.Total,large,text,16,42);
+                g.DrawString("今日已处理 · 私信好友",small,muted,20,86);
+                string stats="成功 "+Summary.Succeeded+"   失败 "+Summary.Failed+"   待发 "+Summary.Pending+(Summary.Unconfirmed>0?"   待确认 "+Summary.Unconfirmed:"");
+                g.DrawString(stats,small,muted,20,117);
+                g.DrawString("仅发送可用私信",small,muted,new RectangleF(Width-170,101,150,22),new StringFormat {Alignment=StringAlignment.Center});
+            }
+        }
         static void Metric(Graphics g,string label,int value,int x,Color color)
         {
             using(var font=AppPalette.Font(9))using(var brush=new SolidBrush(AppPalette.Muted))g.DrawString(label,font,brush,x,53);
@@ -55,13 +70,9 @@ namespace DouyinSpark
         protected override void OnPaint(PaintEventArgs e)
         {
             var g=e.Graphics;g.Clear(AppPalette.Surface);g.SmoothingMode=SmoothingMode.AntiAlias;
-            float cx=Width/2f;float top=Math.Max(8,Height/2f-64);
-            using(var brush=new SolidBrush(AppPalette.Soft))g.FillEllipse(brush,cx-35,top,70,70);
-            KittyTheme.PaintKittyFace(g,cx+3,top+30,48);
-            using(var font=AppPalette.Font(10,true))using(var brush=new SolidBrush(AppPalette.Text))
-                g.DrawString("还没有发送记录",font,brush,new RectangleF(0,top+78,Width,25),new StringFormat {Alignment=StringAlignment.Center});
-            using(var font=AppPalette.Font(9))using(var brush=new SolidBrush(AppPalette.Muted))
-                g.DrawString("先添加好友，再点上方「开始发送」吧",font,brush,new RectangleF(0,top+107,Width,24),new StringFormat {Alignment=StringAlignment.Center});
+            float top=Math.Max(6,Height/2f-24);
+            using(var font=AppPalette.Font(10,true))using(var brush=new SolidBrush(AppPalette.Muted))g.DrawString("暂无发送记录",font,brush,new RectangleF(0,top,Width,25),new StringFormat {Alignment=StringAlignment.Center});
+            if(Height>90)using(var font=AppPalette.Font(8))using(var brush=new SolidBrush(AppPalette.Muted))g.DrawString("在此查看所选联系人的发送结果",font,brush,new RectangleF(0,top+28,Width,22),new StringFormat {Alignment=StringAlignment.Center});
         }
     }
 }
