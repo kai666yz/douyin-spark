@@ -1,28 +1,72 @@
-# douyin-spark · 抖音续火花助手
+# 抖音续火花 · douyin-spark
 
-Windows 桌面小工具，通过抖音网页版向自己配置的好友发送问候消息。C# WinForms 界面搭配 Python + Playwright，当前版本 **v1.8.3**。
+Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发送自己配置的问候消息。当前版本 **v1.9.0**。
 
-## 功能
+## 便携版使用
 
-- 一键导入关注列表并勾选好友；支持手动添加、删除和查看好友今日状态。
-- 消息预览、发送进度、取消任务和发送记录。
-- 当天发送查重、每日定时与开机自启。
-- 粉色猫咪主题、启动动画和进度完成动画。
-- Edge、Chrome、夸克浏览器选择；使用软件专用的浏览器目录保存登录状态。
-- 语录管理：勾选消息分类，编辑自定义语录；兼容旧版句子库格式。
+1. 从 [GitHub Releases](https://github.com/kai666yz/douyin-spark/releases/latest) 下载 Windows x64 ZIP，完整解压。
+2. 双击 `抖音续火花.exe`，保留旁边的整个 `spark_backend` 文件夹。
+3. 在“更多功能 → 浏览器选择”中选择已安装的 Edge、Chrome 或夸克。
+4. 使用“更多功能 → 登录自检”扫码登录，再通过“添加好友”勾选导入关注列表，或在“管理好友”中填写主页链接。
+5. 预览消息、核对名单后开始发送。新包好友名单为空，没有作者的登录状态或私人记录。
 
-定时发送需要程序保持运行且电脑处于唤醒状态。网页识别会受到抖音页面变化和账号状态影响，不保证消息送达或火花状态。
+便携包已含独立 Python/Playwright 后端，无需另装 Python、豆包或下载 Playwright 浏览器内核。需要 Windows 10/11、.NET Framework 4.x（推荐4.8）及上述已安装浏览器之一。
 
-## 运行要求
+旧版迁移时先退出旧程序，保留自己的 `friends.json`、`config.json`、对应 `browser_profile*` 和 `logs`，复制到新版目录。不要用下载包的空名单覆盖自己的名单。
 
-- Windows 10/11，推荐 64 位。
-- .NET Framework 4.x，推荐系统自带的 4.8。
-- Python 3.10 或更新版本；在安装时勾选加入 PATH。
-- 已安装 Edge、Chrome 或夸克，并能访问抖音网页版。
+## 功能与入口
 
-## 从源码启动
+| 功能 | 入口与行为 |
+|---|---|
+| 添加好友 | “添加好友”导入关注列表；“更多功能 → 管理好友”手动添加、粘贴个人主页短链、删除 |
+| 好友状态 | 查看今天的状态；缺失主页显示“待补”，不会猜测链接 |
+| 语录管理 | 勾选分类、编辑自定义语录；支持旧句子库格式与节日优先 |
+| 固定消息 | “更多功能 → 固定消息设置”；留空恢复语录池，保存后对手动和定时任务生效 |
+| 定时与自启 | 程序运行且电脑唤醒时按设定时间执行；开机自启使用 `--minimized` |
+| 托盘 | 最小化或关闭窗口后继续在托盘运行；右键托盘选择“退出” |
+| 历史 | 表格显示最近活动记录；更多功能中导出全部 CSV、清理旧历史 |
+| 检查更新 | 查询 GitHub Releases；确认后打开官方下载页，手动更新 |
 
-在项目目录打开 PowerShell，依次执行：
+固定消息绕过语录池和“最近7天句子不重复”，**仍保留当天好友去重**。无需修改句子库，也无需删除日志。历史清理会先备份并保留今天的记录，避免清理历史后重复发送。
+
+## 命令行
+
+在解压目录打开 PowerShell：
+
+```powershell
+# 仅预览固定消息；不启动浏览器，不发送。
+.\spark_backend\spark_backend.exe --dry-run --message "嘎嘎地拉下"
+
+# 真正发送前，先核对好友和消息。省略 --dry-run 才会执行发送。
+.\spark_backend\spark_backend.exe --message "自己填写的问候消息"
+
+# 打开浏览器进行登录检查；不会发送消息。
+.\spark_backend\spark_backend.exe --selftest
+
+# 仅用本地 HTML 检查浏览器运行环境，不访问抖音。
+.\spark_backend\spark_backend.exe --runtime-check
+
+# 导出历史，不执行发送。
+.\spark_backend\spark_backend.exe --export-history ".\发送历史.csv"
+```
+
+源码运行时将上面的后端命令改为 `.\.venv\Scripts\python.exe .\douyin_spark.py`，参数相同。`--friend` 可筛选好友；`--force` 明确忽略当天好友去重，用于人工决定的重发。`--cancel-file PATH` 指定的文件出现后会停止后续处理。
+
+## 稳定性与数据保护
+
+- 好友名单使用 JSON 读写，保存时原子替换并保留 `.bak`，支持 BOM 与尾逗号。损坏文件会报错并保留原文。
+- CSV 活动日志保留最近14天，其余按月放入 `logs/archive/spark_log`。语录去重和导出仍读取归档。
+- 文本日志每份最多约2 MiB，再轮换至 `.1`～`.5`。运行输出在下一次启动时重置。
+- 检测到验证码时暂停，提示在浏览器手动处理，最多等待5分钟；页面提示操作频繁时停止任务。
+- 未提交失败最多额外重试2次，分别退避2、4秒并重建页面；不切换 UA 或自动解验证码。
+- 按下发送键前写入待确认记录；结果不确定时保留 `UNCONFIRMED`，不会自动重发，当天默认跳过该好友。
+- 任务锁防止多个发送/导入任务占用同一目录。网站变化、网络及账号状态仍可能影响识别；应核对异常记录。
+
+`friends.json`、配置、关注列表、浏览器登录状态、日志、备份和运行环境均在 `.gitignore` 中。自定义语录存放在句子库中，提交修改前须自行检查；发布脚本会清空“自定义”分类。
+
+## 从源码构建
+
+安装 Python 3.10+ 并加入 PATH，在仓库目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
@@ -30,62 +74,39 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 .\抖音续火花.exe
 ```
 
-`setup.ps1` 会在本项目创建 `.venv`、安装 Playwright，并在不存在时创建空的好友名单。程序优先使用环境变量 `DOUYIN_SPARK_PYTHON` 指定的 Python，其次查找 `.venv`、便携 `runtime` 和 PATH；不依赖豆包或作者电脑上的路径。
+界面先寻找随包独立后端；未找到时依次使用 `.venv`、`DOUYIN_SPARK_PYTHON` 指定路径、便携 `runtime`、系统 PATH，最后才兼容查找当前用户的豆包沙箱。不存在固定用户名或沙箱版本路径。
 
-程序使用已安装的浏览器，因此不必执行 `playwright install`。构建后请保留 exe 与两个 Python 脚本、句子库在同一目录。
-
-## 首次使用
-
-1. 在“更多功能 → 浏览器选择”中选择已安装的浏览器。
-2. 点击“添加好友”导入关注列表并勾选；也可在“更多功能 → 管理好友”中手动添加主页链接。
-3. 在“更多功能 → 登录自检”中扫码登录。普通浏览器窗口中的登录状态不会自动共享到本工具。
-4. 在“语录管理”中选好分类，使用“更多功能 → 预览句子”核对消息与名单，确认后再开始发送。
-
-关注列表脚本会打开浏览器，读取当前账号关注列表并保存为本地 `following.json`，不发送消息。页面可能需要先完成登录。
-
-### 命令行
-
-以下示例中的 `--dry-run` 只预览，不启动浏览器、不发送消息：
+生成可分发 ZIP：
 
 ```powershell
-.\.venv\Scripts\python.exe .\douyin_spark.py --dry-run
-.\.venv\Scripts\python.exe .\douyin_spark.py --dry-run --friend 示例好友
+powershell -ExecutionPolicy Bypass -File .\package.ps1
 ```
 
-空名单会显示提示并退出。真实使用的 `friends.json` 格式为：
+输出在 `dist/douyin-spark-v1.9.0-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。
 
-```json
-[
-  {"name": "示例好友", "url": "https://www.douyin.com/user/替换为真实用户ID"}
-]
-```
-
-上面是格式示例，须替换为真实主页链接。`sentences_pool.json` 中的 `categories` 保存分类语录，`active_categories` 指定启用的分类；`sentences` 保留用于旧版兼容与回退，`holiday` 可按 `MM-DD` 配置节日消息。自定义内容会保存在本机句子库中；公开分享改动前，请先检查是否包含私人信息。
-
-## 项目结构
+## 源码结构
 
 ```text
-douyin-spark/
-├── src/app.cs           # WinForms 主程序
-├── douyin_spark.py      # 发送与日志脚本
-├── fetch_following.py   # 关注列表读取
-├── sentences_pool.json # 公开的示例句子库
-├── icon.ico
-├── build.ps1            # C# 编译
-├── setup.ps1            # 本地 Python 环境与依赖
-├── requirements.txt
-├── LICENSE
-└── .gitignore
+src/app.cs              主窗口、定时与运行状态
+src/FriendsForm.cs      好友管理与关注导入
+src/Storage.cs          JSON、CSV与文本日志
+src/BackendLauncher.cs  后端选择与进程启动
+src/DesktopFeatures.cs 托盘、固定消息、历史和更新检查
+src/Theme.cs            主题绘制
+src/SparkProgress.cs    进度与完成动画
+src/Controls.cs         其他自绘控件
+douyin_spark.py         消息流程与命令行参数
+fetch_following.py      关注列表读取
+spark_support.py       路径、归档、任务锁、人工验证支持
+spark_backend.py       独立后端入口
+tests/                 离线回归测试
+tools/package_release.py 发布打包
 ```
 
-## 数据与开发说明
+离线测试：`python -m unittest discover -s tests -p "test_*.py"`。C#存储测试见 `tests/StorageTests.cs`，需与 `src/Storage.cs` 一同编译为控制台程序。
 
-好友、配置、关注列表、浏览器登录状态和日志仅在本机生成，已加入 `.gitignore`。发布前仍应检查 Git 暂存内容，避免手动强制添加这些文件。
+## 许可证
 
-界面“检查更新”读取本地 `update` 目录，当前没有在线更新服务。此次开源准备已检查 C# 编译、Python 语法和离线预览流程，未执行真实消息发送。
+原创代码采用 [MIT](LICENSE)。第三方依赖按各自许可证分发；Hello Kitty 等名称、形象及相关素材权利归各自权利人，MIT 不授予这些权利。本项目与抖音及相关品牌无隶属关系。请仅向愿意接收消息的好友使用。
 
-## 许可证与使用范围
-
-项目原创代码按 [MIT](LICENSE) 许可证提供。第三方依赖使用各自许可证；Hello Kitty 等第三方名称、角色形象及相关素材权利归各自权利人，MIT 许可不授予这些权利。本项目与抖音及相关品牌无隶属关系。
-
-请仅向愿意接收消息的好友使用，勿用于骚扰、营销或规避平台限制。账号状态及网页变化可能影响运行。
+本版已进行离线测试、界面渲染及独立后端本地浏览器检查；未进行真实消息发送或在线验证码验证。变更见 [CHANGELOG](CHANGELOG.md)。

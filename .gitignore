@@ -21,6 +21,12 @@ run_err.txt
 
 # Environments / builds / temporary updates
 .venv/
+.build-venv/
+*.spec
+*.tmp
+.spark-task.lock
+*.bak
+releases/
 venv/
 runtime/
 __pycache__/

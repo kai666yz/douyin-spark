@@ -13,10 +13,12 @@ $compilerArgs = @(
     "/out:$projectDir\抖音续火花.exe",
     "/win32icon:$projectDir\icon.ico",
     '/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll',
-    '/r:System.Windows.Forms.dll',
-    "/r:$frameworkDir\WPF\WindowsFormsIntegration.dll",
-    "$projectDir\src\app.cs"
+    '/r:System.Windows.Forms.dll', '/r:System.Web.Extensions.dll', '/r:System.Management.dll', '/r:System.Data.dll',
+    "/r:$frameworkDir\Microsoft.VisualBasic.dll",
+    "/r:$frameworkDir\WPF\WindowsFormsIntegration.dll"
+
 )
+$compilerArgs += @(Get-ChildItem -LiteralPath (Join-Path $projectDir 'src') -Filter '*.cs' | ForEach-Object FullName)
 & $compiler @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'C# compilation failed.' }
 Write-Host "Built: $projectDir\抖音续火花.exe"

@@ -14,6 +14,7 @@
 import json, csv, os, sys, time, random, argparse, re
 from datetime import datetime
 from pathlib import Path
+from spark_support import (VERSION, data_dir, history_paths, rotate_csv, export_history, clear_history, wait_for_verification, acquire_task_lock)
 
 # 修复 exe 启动子进程时 GBK 编码崩溃（好友名含 emoji 如 🐷🦀）
 try:
@@ -22,7 +23,7 @@ try:
 except Exception:
     pass
 
-BASE = Path(__file__).parent
+BASE = data_dir()
 PROFILE_DIR = BASE / "browser_profile"
 CONFIG_FILE = BASE / "config.json"
 
@@ -88,7 +89,7 @@ def show_chrome_window(title_key="Google Chrome"):
         pass
 
 def load_json(p):
-    with open(p, "r", encoding="utf-8") as f:
+    with open(p, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
 def pick_sentences(n=23, avoid_days=7, on_date=None):
@@ -109,15 +110,15 @@ def pick_sentences(n=23, avoid_days=7, on_date=None):
     d = on_date or datetime.now()
     today_key = d.strftime("%m-%d")
     used = set()
-    if LOG_FILE.exists():
-        cutoff = datetime.now().timestamp() - avoid_days * 86400
-        with open(LOG_FILE, "r", encoding="utf-8-sig", newline="") as f:
+    cutoff = datetime.now().timestamp() - avoid_days * 86400
+    for history in history_paths(LOG_FILE):
+        with open(history, "r", encoding="utf-8-sig", newline="") as f:
             for row in csv.DictReader(f):
                 try:
                     ts = datetime.strptime(row["time"], "%Y-%m-%d %H:%M:%S").timestamp()
                     if ts >= cutoff:
                         used.add(row["message"])
-                except Exception:
+                except (ValueError, KeyError):
                     pass
     avail = [s for s in sentences if s not in used]
     random.seed()
@@ -144,7 +145,7 @@ def already_sent_today():
         with open(LOG_FILE, "r", encoding="utf-8-sig", newline="") as f:
             for row in csv.DictReader(f):
                 try:
-                    if row.get("time", "").startswith(today) and row.get("status", "") == "OK":
+                    if row.get("time", "").startswith(today) and row.get("status", "") in ("OK", "UNCONFIRMED"):
                         sent.add(row.get("url", "").rstrip("/"))
                 except Exception:
                     continue
@@ -153,6 +154,7 @@ def already_sent_today():
     return sent
 
 def append_log(rows):
+    rotate_csv(LOG_FILE)
     new = not LOG_FILE.exists()
     with open(LOG_FILE, "a", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
@@ -273,6 +275,12 @@ def send_one(page, friend, msg, dry=False, cancel_file=None):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--version", action="version", version=VERSION)
+    ap.add_argument("--message", help="对所有选中好友使用固定消息，跳过句子池与句子去重；仍保留当天好友去重")
+    ap.add_argument("--fetch-following", action="store_true", help="读取关注列表，不发送消息")
+    ap.add_argument("--export-history", type=Path, help="导出全部 CSV 历史记录，不发送消息")
+    ap.add_argument("--clear-history", action="store_true", help="清理旧历史并备份，保留今日记录")
+    ap.add_argument("--runtime-check", action="store_true", help="只用本地 HTML 检查浏览器运行环境")
     ap.add_argument("--dry-run", action="store_true", help="只抽句子不发")
     ap.add_argument("--selftest", action="store_true", help="打开浏览器登录+验证选择器，不发消息")
     ap.add_argument("--friend", help="只跑指定好友名")
@@ -281,20 +289,64 @@ def main():
     ap.add_argument("--friends-file", type=Path, default=FRIENDS_FILE, help="本次选中的好友名单")
     ap.add_argument("--cancel-file", type=Path, help="存在时停止后续发送")
     args = ap.parse_args()
-
+    if args.message is not None and not args.message.strip():
+        ap.error("--message 不能是空白文本")
+    task_handle = None
+    if not args.dry_run and not args.runtime_check and not args.export_history:
+        try:
+            task_handle = acquire_task_lock(BASE / '.spark-task.lock')
+        except RuntimeError as exc:
+            ap.error(str(exc))
+    if args.fetch_following:
+        from fetch_following import main as fetch_main
+        fetch_main()
+        return
+    if args.export_history:
+        export_history(LOG_FILE, args.export_history)
+        return
+    if args.clear_history:
+        clear_history(LOG_FILE)
+        return
+    if args.runtime_check:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            tg = browser_targets(read_browser_choice())
+            options = {"headless": True}
+            if tg['channel']:
+                options['channel'] = tg['channel']
+            if tg['exe']:
+                options['executable_path'] = tg['exe']
+            browser = p.chromium.launch(**options)
+            page = browser.new_page()
+            page.set_content('<h1>Local runtime check</h1>')
+            assert page.locator('h1').inner_text() == 'Local runtime check'
+            browser.close()
+        print('运行环境检查通过：未访问抖音，未发送消息。')
+        return
+    if not args.dry_run:
+        rotate_csv(LOG_FILE)
     if not args.friends_file.exists():
         print("好友名单不存在，请先在软件中添加好友，或创建 friends.json。")
         return
     friends = load_json(args.friends_file)
-    if not isinstance(friends, list) or any(
-        not isinstance(f, dict) or not isinstance(f.get("name"), str)
-        or not re.fullmatch(r"https://www\.douyin\.com/user/[A-Za-z0-9_-]+/?", f.get("url", ""))
-        for f in friends
-    ):
-        raise ValueError("好友名单格式或主页链接不正确")
+    if not isinstance(friends, list):
+        raise ValueError("好友名单必须是 JSON 数组，原文件未修改")
+    valid = []
+    for friend in friends:
+        if (isinstance(friend, dict) and isinstance(friend.get('name'), str)
+                and isinstance(friend.get('url'), str)
+                and re.fullmatch(r'https://www\.douyin\.com/user/[A-Za-z0-9_-]+/?', friend['url'])):
+            valid.append(friend)
+        else:
+            label = friend.get('name','未命名') if isinstance(friend,dict) else '无效条目'
+            print(f'[待补主页] {label}：本次跳过，不猜测链接。', flush=True)
+    friends = valid
     if not friends:
-        print("好友名单为空，请先添加或选择好友。")
-        return
+        if args.selftest:
+            friends = [{'name': '登录检查', 'url':'https://www.douyin.com/'}]
+        else:
+            print("没有可发送的好友，请先添加完整主页链接。")
+            return
     if args.cancel_file and args.cancel_file.exists():
         print("任务已取消。")
         return
@@ -327,7 +379,7 @@ def main():
                 print("\n今天已全部发送完成，无需重复发送。")
                 return
 
-    msgs = pick_sentences(n=len(friends))
+    msgs = [args.message] * len(friends) if args.message is not None else pick_sentences(n=len(friends))
     if len(msgs) < len(friends):
         print(f"警告：句子池只剩 {len(msgs)} 句，不够 {len(friends)} 人")
 
@@ -401,15 +453,19 @@ def main():
     import asyncio
     from playwright.async_api import async_playwright
 
-    CONCURRENCY = 2
+    CONCURRENCY = 1  # 遇到验证时整批任务暂停，避免其他并发任务继续发送
+    halted = [False]
     done_count = [0]            # 已处理人数（进度上报）
     total_count = [len(friends)]  # 总人数（第一轮）
 
     async def send_one_async(page, friend, msg, cancel_file=None):
         name, url = friend["name"], friend["url"]
+        submitted = False
         try:
             if cancel_file and Path(cancel_file).exists():
                 return ("CANCELLED", "已取消后续发送")
+            if halted[0]:
+                return ("STOPPED", "任务已暂停或停止")
             sec_uid = url.rstrip("/").rsplit("/", 1)[-1]
             # 导航 + URL 校验重试（并发时可能被抖音重定向或 ERR_ABORTED）
             for attempt in range(3):
@@ -421,6 +477,14 @@ def main():
                     await page.wait_for_timeout(2500)
                     continue
                 await page.wait_for_timeout(1800)
+                if not await wait_for_verification(page, lambda: show_chrome_window(browser_targets(read_browser_choice())['title']), cancel_file):
+                    halted[0] = True
+                    return ("CAPTCHA", "需要人工验证，任务已停止")
+                body_text = await page.locator('body').inner_text(timeout=3000)
+                if any(text in body_text for text in ('操作过于频繁', '访问过于频繁')):
+                    halted[0] = True
+                    print('ATTENTION|RATE_LIMIT|页面提示操作频繁，本次任务停止。', flush=True)
+                    return ("RATE_LIMIT", "请稍后人工重试")
                 cur = page.url
                 if "login" in cur or "passport" in cur:
                     return ("LOGIN_EXPIRED", "登录态失效，请重新扫码")
@@ -496,31 +560,43 @@ def main():
                 return ("NO_INPUT", "聊天窗未弹出或找不到输入框")
             if cancel_file and Path(cancel_file).exists():
                 return ("CANCELLED", "已取消后续发送")
+            if not await wait_for_verification(page, lambda: show_chrome_window(browser_targets(read_browser_choice())['title']), cancel_file):
+                halted[0] = True
+                return ("CAPTCHA", "需要人工验证")
+            previous_matches = 0
+            for frame in page.frames:
+                try:
+                    previous_matches += await frame.get_by_text(msg, exact=True).count()
+                except Exception:
+                    pass
             await editor.click()
             await page.wait_for_timeout(300)
             await editor.type(msg, delay=20)
             await page.wait_for_timeout(250)
             if cancel_file and Path(cancel_file).exists():
                 return ("CANCELLED", "已取消，未按下发送键")
+            submitted = True
+            append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", name, url, msg, "UNCONFIRMED", "提交前记录；中断后请人工确认，避免重复发送"]])
             await page.keyboard.press("Enter")
             await page.wait_for_timeout(1500)
+            if not await wait_for_verification(page, lambda: show_chrome_window(browser_targets(read_browser_choice())['title']), cancel_file):
+                halted[0] = True
+                return ("UNCONFIRMED", "发送触发验证且未完成，请人工确认结果")
             # 确认发送：跨 frame 找刚发的消息文本
             try:
-                confirmed = False
+                matches = 0
                 for f in page.frames:
                     try:
-                        if await f.get_by_text(msg, exact=False).count() > 0:
-                            confirmed = True
-                            break
+                        matches += await f.get_by_text(msg, exact=True).count()
                     except Exception:
                         continue
-                if confirmed:
+                if matches > previous_matches:
                     return ("OK", msg)
-                return ("OK", msg + "（未确认）")
+                return ("UNCONFIRMED", "已尝试发送但未确认，请人工查看；不会自动重发")
             except Exception:
-                return ("OK", msg)
+                return ("UNCONFIRMED", "发送结果不确定，请人工查看")
         except Exception as e:
-            return ("ERROR", str(e)[:120])
+            return ("UNCONFIRMED" if submitted else "ERROR", str(e)[:120])
 
     async def worker(ctx, group, cancel_file=None, delay=0):
         if delay > 0:
@@ -529,6 +605,8 @@ def main():
         page.set_default_timeout(15000)
         out = []
         for f, m in group:
+            if halted[0]:
+                break
             if cancel_file and Path(cancel_file).exists():
                 break
             try:
@@ -547,11 +625,13 @@ def main():
                 except Exception as e2:
                     status, note = ("ERROR", str(e2)[:80])
             out.append((f, m, status, note))
+            append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", f['name'], f['url'], m, status, note]])
             flag = "✓" if status == "OK" else "✗"
             print(f"  {flag} {f['name']:<16} [{status}] {note}", flush=True)
             done_count[0] += 1
             print(f"PROGRESS|{done_count[0]}|{total_count[0]}|{f['name']}|{status}", flush=True)
-            if status == "LOGIN_EXPIRED":
+            if status in ("LOGIN_EXPIRED", "CAPTCHA", "RATE_LIMIT", "STOPPED"):
+                halted[0] = True
                 break
             if not args.no_sleep:
                 try:
@@ -570,30 +650,25 @@ def main():
         return out
 
     async def retry_failed(ctx, failed, cancel_file=None):
-        """对第一轮失败的好友逐个补发（顺序执行，避免再触发风控）"""
+        """只对未提交的失败执行有限退避，不重发结果不确定的消息。"""
         out = []
         for f, m, old_status, old_note in failed:
-            if cancel_file and Path(cancel_file).exists():
-                break
-            page = await ctx.new_page()
-            page.set_default_timeout(15000)
-            try:
-                status, note = await send_one_async(page, f, m, cancel_file)
-            except Exception as e:
-                status, note = ("ERROR", str(e)[:80])
-            try:
-                await page.close()
-            except Exception:
-                pass
-            flag = "✓" if status == "OK" else "✗"
-            print(f"  [补发] {flag} {f['name']:<16} [{status}] {note}", flush=True)
-            done_count[0] += 1
-            print(f"PROGRESS|{done_count[0]}|{total_count[0]}|{f['name']}|{status}", flush=True)
-            out.append((f, m, status, note))
-            if status == "LOGIN_EXPIRED":
-                break
-            if not args.no_sleep:
-                await asyncio.sleep(1.2)
+            status, note = old_status, old_note
+            for attempt in range(2):
+                if halted[0] or (cancel_file and Path(cancel_file).exists()):
+                    break
+                print(f"[重试 {attempt+1}/2] 等待 {2**(attempt+1)} 秒：{f['name']}", flush=True)
+                await asyncio.sleep(2**(attempt+1))
+                page = await ctx.new_page()
+                page.set_default_timeout(15000)
+                try:
+                    status, note = await send_one_async(page, f, m, cancel_file)
+                finally:
+                    await page.close()
+                append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", f['name'], f['url'], m, status, note]])
+                if status not in ('ERROR','NO_BTN','NO_INPUT'):
+                    break
+            out.append((f,m,status,note))
         return out
 
     async def run():
@@ -635,14 +710,14 @@ def main():
             failed = [
                 (f, m, s, n)
                 for ch in results for f, m, s, n in ch
-                if s not in ("OK", "LOGIN_EXPIRED", "CANCELLED")
+                if s in ("ERROR", "NO_BTN", "NO_INPUT")
             ]
-            if failed:
+            if failed and not halted[0]:
                 print(f"\n第一轮完成，{len(failed)} 人未成功，开始补发...", flush=True)
                 retried = await retry_failed(ctx, failed, args.cancel_file)
                 flat = [item for ch in results for item in ch]
                 retry_map = {f["url"].rstrip("/"): (f, m, s, n) for f, m, s, n in retried}
-                flat = [retry_map.get(f["url"].rstrip("/"), item) for item in flat]
+                flat = [retry_map.get(item[0]["url"].rstrip("/"), item) for item in flat]
                 results = [flat]
 
             await ctx.close()
@@ -659,7 +734,6 @@ def main():
                 ok += 1
             else:
                 fail += 1
-    append_log(rows)
     write_daily_report(rows)
 
     print("\n" + "=" * 50)
