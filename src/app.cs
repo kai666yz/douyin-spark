@@ -24,7 +24,7 @@ namespace DouyinSpark
         static string scheduleTime = "";     // 每日定时 "HH:mm"
         static bool scheduleFired = false;   // 当天是否已触发
         static string scheduleLastDay = "";  // 上次触发的日期
-        const string AppVersion = "1.9.0";   // 当前版本（与 update/version.json 对比）
+        const string AppVersion = "1.9.1";
 
         // HelloKitty 主题别名（Program 内直接使用）
         static readonly Color KPink = KittyTheme.KPink;

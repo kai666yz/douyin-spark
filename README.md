@@ -1,6 +1,6 @@
 # 抖音续火花 · douyin-spark
 
-Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发送自己配置的问候消息。当前版本 **v1.9.0**。
+Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发送自己配置的问候消息。当前版本 **v1.9.1**。
 
 ## 便携版使用
 
@@ -82,7 +82,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\package.ps1
 ```
 
-输出在 `dist/douyin-spark-v1.9.0-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。
+输出在 `dist/douyin-spark-v1.9.1-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。
 
 ## 源码结构
 

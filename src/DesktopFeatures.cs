@@ -72,7 +72,7 @@ namespace DouyinSpark
                 {
                     ServicePointManager.SecurityProtocol=(SecurityProtocolType)3072;
                     string json;
-                    using(var web=new WebClient()) {web.Headers["User-Agent"]="douyin-spark/"+AppVersion;json=web.DownloadString("https://api.github.com/repos/kai666yz/douyin-spark/releases/latest");}
+                    using(var web=new WebClient()) {web.Encoding=System.Text.Encoding.UTF8;web.Headers["User-Agent"]="douyin-spark/"+AppVersion;json=web.DownloadString("https://api.github.com/repos/kai666yz/douyin-spark/releases/latest");}
                     var release=SparkStorage.Json().Deserialize<Dictionary<string,object>>(json);
                     string version=Convert.ToString(release["tag_name"]).TrimStart('v');
                     bool newer=CompareVersion(version,AppVersion)>0;
