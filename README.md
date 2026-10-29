@@ -1,6 +1,6 @@
 # 抖音续火花 · douyin-spark
 
-Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发送自己配置的问候消息。当前版本 **v1.10.0**。
+Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发送自己配置的问候消息。当前版本 **v2.0.0**。
 
 ## 界面预览
 
@@ -15,12 +15,22 @@ Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发�
 1. 从 [GitHub Releases](https://github.com/kai666yz/douyin-spark/releases/latest) 下载 Windows x64 ZIP，完整解压。
 2. 双击 `抖音续火花.exe`，保留旁边的整个 `spark_backend` 文件夹。
 3. 在“更多功能 → 浏览器选择”中选择已安装的 Edge、Chrome 或夸克。
-4. 使用“更多功能 → 登录自检”扫码登录，再通过“添加好友”勾选导入关注列表，或在“管理好友”中填写主页链接。
+4. 点击“添加好友”，在软件弹出的专用浏览器中扫码登录，等待读取后勾选导入；也可在“更多功能 → 管理好友”中手动填写主页链接。
 5. 预览消息、核对名单后开始发送。新包好友名单为空，没有作者的登录状态或私人记录。
 
 便携包已含独立 Python/Playwright 后端，无需另装 Python、豆包或下载 Playwright 浏览器内核。需要 Windows 10/11、.NET Framework 4.x（推荐4.8）及上述已安装浏览器之一。
 
 旧版迁移时先退出旧程序，保留自己的 `friends.json`、`config.json`、对应 `browser_profile*` 和 `logs`，复制到新版目录。不要用下载包的空名单覆盖自己的名单。
+
+### v2.0 关注列表导入
+
+- 软件的浏览器 profile 与日常浏览器相互独立。请在软件弹出的窗口中登录，最多等待3分钟；必要时手动打开自己的关注列表。
+- 读取窗口显示阶段及已发现人数，支持取消；关闭读取窗口也会请求取消，等待当前浏览器操作结束。重复点击不会重复启动导入。
+- 仅明确的成功接口、结束标记与总数一致时才标为完整；网页链接回退和无法确认总数的结果标为“部分”，需用户确认后再勾选。
+- 区分完整、部分、已确认空列表、未登录、失败和取消；0人不会弹空勾选窗。只有接口明确证明0人时才显示“暂无关注”。
+- 失败、空列表、部分结果和取消均保留原关注缓存。完整结果仅更新关注缓存；实际好友名单只在点击“导入选中”时追加去重。
+- 失败窗口提供重试、手动添加和本次诊断；诊断摘要位于 `logs/following_import.log`，按现有文本日志策略轮换。
+- 网站变动、权限限制或接口没有总数时可能只能获得部分数据；软件不会将不确定结果描述为完整。
 
 ## 功能与入口
 
@@ -92,13 +102,14 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\package.ps1
 ```
 
-输出在 `dist/douyin-spark-v1.10.0-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。
+输出在 `dist/douyin-spark-v2.0.0-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。
 
 ## 源码结构
 
 ```text
 src/app.cs              主窗口、定时与运行状态
 src/FriendsForm.cs      好友管理与关注导入
+src/FollowingImport.cs  登录引导、可取消读取、结果校验与诊断
 src/Storage.cs          JSON、CSV与文本日志
 src/BackendLauncher.cs  后端选择与进程启动
 src/DesktopFeatures.cs 托盘、固定消息、历史和更新检查
@@ -118,6 +129,8 @@ tools/package_release.py 发布打包
 ```
 
 离线测试：`python -m unittest discover -s tests -p "test_*.py"`。C#存储测试见 `tests/StorageTests.cs`，需与 `src/Storage.cs` 一同编译为控制台程序。
+
+浏览器离线烟测：`python tools/verify_following_browser.py`，需要本机 Edge。全部网页请求由测试拦截，不登录真实账号、不发送消息。
 
 ## 许可证
 

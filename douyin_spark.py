@@ -278,6 +278,7 @@ def main():
     ap.add_argument("--version", action="version", version=VERSION)
     ap.add_argument("--message", help="对所有选中好友使用固定消息，跳过句子池与句子去重；仍保留当天好友去重")
     ap.add_argument("--fetch-following", action="store_true", help="读取关注列表，不发送消息")
+    ap.add_argument("--following-result", type=Path, help="本次关注列表读取结果文件")
     ap.add_argument("--export-history", type=Path, help="导出全部 CSV 历史记录，不发送消息")
     ap.add_argument("--clear-history", action="store_true", help="清理旧历史并备份，保留今日记录")
     ap.add_argument("--runtime-check", action="store_true", help="只用本地 HTML 检查浏览器运行环境")
@@ -299,7 +300,7 @@ def main():
             ap.error(str(exc))
     if args.fetch_following:
         from fetch_following import main as fetch_main
-        fetch_main()
+        fetch_main(args.following_result, args.cancel_file)
         return
     if args.export_history:
         export_history(LOG_FILE, args.export_history)

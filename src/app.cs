@@ -24,7 +24,7 @@ namespace DouyinSpark
         static string scheduleTime = "";     // 每日定时 "HH:mm"
         static bool scheduleFired = false;   // 当天是否已触发
         static string scheduleLastDay = "";  // 上次触发的日期
-        const string AppVersion = "1.10.0";
+        const string AppVersion = "2.0.0";
 
         // HelloKitty 主题别名（Program 内直接使用）
         static readonly Color KPink = KittyTheme.KPink;
@@ -452,6 +452,7 @@ namespace DouyinSpark
 
         static void DoStart()
         {
+            if(importingFollowing!=0) { Log("正在读取关注列表，定时/发送任务请等待导入结束后再试。"); return; }
             if (btnStart.Enabled == false) { Log("正在运行中，稍等..."); return; }
             if (IsProfileLocked())
             {

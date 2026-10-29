@@ -60,11 +60,17 @@ namespace DouyinSpark
         }
         static string RunBackend(string arguments)
         {
+            return RunBackend(arguments, null);
+        }
+        static string RunBackend(string arguments, Action<string> onLine)
+        {
             var output = new StringBuilder(); var errors = new StringBuilder();
             using (var process = new Process())
             {
                 process.StartInfo = BackendInfo(arguments);
-                process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) lock(output) output.AppendLine(e.Data); };
+                process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) {
+                    if (e.Data != null) { lock(output) output.AppendLine(e.Data); if(onLine!=null) { try { onLine(e.Data); } catch { } } }
+                };
                 process.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) lock(errors) errors.AppendLine(e.Data); };
                 process.Start(); process.BeginOutputReadLine(); process.BeginErrorReadLine(); process.WaitForExit();
                 if (process.ExitCode != 0) throw new InvalidOperationException(errors.ToString().Length > 0 ? errors.ToString() : "后端退出码 " + process.ExitCode);

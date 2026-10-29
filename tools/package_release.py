@@ -47,13 +47,16 @@ def main():
                         target=licenses/name/item.name
                         target.parent.mkdir(parents=True,exist_ok=True)
                         shutil.copy2(source,target)
-        readme='''抖音续火花 v1.10.0 · Windows 64位便携版
+        readme='''抖音续火花 v2.0.0 · Windows 64位便携版
 
 完整解压后双击“抖音续火花.exe”。请保留 spark_backend 整个文件夹。
 已包含独立后端及 Python/Playwright，不用另装 Python、豆包或浏览器内核。
 需要 Windows 10/11、.NET Framework 4.x（推荐4.8），以及已安装的 Edge/Chrome/夸克之一。
 
 首次选择浏览器、扫码登录并添加好友。本包的好友名单为空，不含任何登录状态。
+添加好友时请在软件弹出的独立浏览器中扫码；日常浏览器的登录不会自动继承。
+读取时可取消；失败、空结果和部分结果不覆盖关注缓存，更不会覆盖原好友名单。
+部分结果需确认后勾选导入，未读取成功可查看诊断或手动添加。
 固定消息：更多功能 → 固定消息设置。留空则使用语录池。
 托盘：最小化或关闭窗口后继续在托盘运行；右键托盘选择退出。
 历史：更多功能 → 导出历史 CSV / 清理旧历史。清理前备份并保留今日去重记录。

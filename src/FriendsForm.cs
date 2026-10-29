@@ -106,18 +106,7 @@ namespace DouyinSpark
 
         static void ImportFollowing()
         {
-            Log("正在读取关注列表，请按浏览器提示登录...");
-            new System.Threading.Thread(delegate()
-            {
-                try
-                {
-                    RunBackend("--fetch-following");
-                    var friends=SparkStorage.ReadFriends(Path.Combine(BaseDir,"following.json"));
-                    var items=friends.Select(f=>new[]{f.name,f.url}).ToList();
-                    mainForm.BeginInvoke((Action)delegate { ShowFollowingPick(items,new HashSet<string>()); });
-                }
-                catch(Exception ex) { Log("导入失败："+ex.Message); }
-            }) { IsBackground=true }.Start();
+            StartFollowingImport();
         }
 
         static void ShowFollowingPick(List<string[]> items, HashSet<string> exist)
