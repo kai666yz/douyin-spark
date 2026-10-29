@@ -45,7 +45,9 @@ def browser_targets(browser):
         "quark": Path("Programs/Quark/quark.exe"),
     }[browser]
     roots = [os.environ.get(key) for key in ("LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)")]
+    import shutil
     exe = next((str(Path(d) / relative) for d in roots if d and (Path(d) / relative).is_file()), None)
+    exe = exe or shutil.which({'msedge':'msedge.exe','chrome':'chrome.exe','quark':'quark.exe'}[browser])
     if browser == "quark" and not exe:
         raise RuntimeError("没有找到夸克浏览器，请安装夸克或切换至 Edge/Chrome。")
     return {
@@ -89,8 +91,8 @@ def show_chrome_window(title_key="Google Chrome"):
         pass
 
 def load_json(p):
-    with open(p, "r", encoding="utf-8-sig") as f:
-        return json.load(f)
+    from spark_support import read_json
+    return read_json(p)
 
 def pick_sentences(n=23, avoid_days=7, on_date=None):
     """抽句子：按启用的分类抽，当天有节日主题则优先用节日句"""
@@ -282,6 +284,7 @@ def main():
     ap.add_argument("--export-history", type=Path, help="导出全部 CSV 历史记录，不发送消息")
     ap.add_argument("--clear-history", action="store_true", help="清理旧历史并备份，保留今日记录")
     ap.add_argument("--runtime-check", action="store_true", help="只用本地 HTML 检查浏览器运行环境")
+    ap.add_argument("--environment-check", action="store_true", help="输出后端、数据目录与浏览器依赖信息，不登录、不发送")
     ap.add_argument("--dry-run", action="store_true", help="只抽句子不发")
     ap.add_argument("--selftest", action="store_true", help="打开浏览器登录+验证选择器，不发消息")
     ap.add_argument("--friend", help="只跑指定好友名")
@@ -293,7 +296,7 @@ def main():
     if args.message is not None and not args.message.strip():
         ap.error("--message 不能是空白文本")
     task_handle = None
-    if not args.dry_run and not args.runtime_check and not args.export_history:
+    if not args.dry_run and not args.runtime_check and not args.export_history and not args.environment_check:
         try:
             task_handle = acquire_task_lock(BASE / '.spark-task.lock')
         except RuntimeError as exc:
@@ -304,6 +307,17 @@ def main():
         return
     if args.export_history:
         export_history(LOG_FILE, args.export_history)
+        return
+    if args.environment_check:
+        import sys
+        import importlib.metadata
+        browser = read_browser_choice()
+        try:
+            target=browser_targets(browser)
+            browser_found=bool(target['exe'])
+        except RuntimeError:
+            browser_found=False
+        print(json.dumps({'app_version':VERSION,'python_version':sys.version.split()[0], 'playwright_version':importlib.metadata.version('playwright'),'data_dir':str(BASE),'browser':browser,'browser_found':browser_found,'frozen':bool(getattr(sys,'frozen',False))},ensure_ascii=False))
         return
     if args.clear_history:
         clear_history(LOG_FILE)

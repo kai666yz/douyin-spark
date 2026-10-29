@@ -43,7 +43,7 @@ namespace DouyinSpark
             {
                 overview.Summary=TodaySummary.Build(SparkStorage.ReadFriends(FriendsPath),SparkStorage.ReadCsv(Path.Combine(BaseDir,"logs","spark_log.csv")),DateTime.Now);
                 DateTime when;
-                overview.NextText=DateTime.TryParseExact(scheduleTime,"HH:mm",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out when)
+                overview.NextText=schedulePaused&&!string.IsNullOrEmpty(scheduleTime)?"定时已暂停 · 等待确认":DateTime.TryParseExact(scheduleTime,"HH:mm",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out when)
                     ? "下次定时 · "+(DateTime.Now.TimeOfDay<when.TimeOfDay?"今天 ":"明天 ")+scheduleTime : "尚未设置定时";
                 overview.ModeText=fixedMessage.Length>0?"固定消息":"分类语录";
                 overview.AccessibleName="今日已处理 "+overview.Summary.Processed+" / "+overview.Summary.Total+"，成功 "+overview.Summary.Succeeded+"，失败 "+overview.Summary.Failed+"，待发 "+overview.Summary.Pending+"，待确认 "+overview.Summary.Unconfirmed+"。"+overview.NextText;

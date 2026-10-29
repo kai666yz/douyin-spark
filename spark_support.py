@@ -10,7 +10,7 @@ import shutil
 import sys
 import tempfile
 
-VERSION = '2.1.1'
+VERSION = '2.2.0'
 FIELDS = ['time', 'friend', 'url', 'message', 'status', 'note']
 
 def acquire_task_lock(path):
@@ -39,8 +39,80 @@ def data_dir():
         return Path(override).resolve()
     if getattr(sys, 'frozen', False):
         folder = Path(sys.executable).resolve().parent
-        return folder.parent if folder.name == 'spark_backend' else folder
-    return Path(__file__).resolve().parent
+        folder = folder.parent if folder.name == 'spark_backend' else folder
+    else:
+        folder = Path(__file__).resolve().parent
+    return resolve_data_dir(folder)
+
+
+def resolve_data_dir(folder, local_root=None, writable=None):
+    """Match the desktop data routing, including a sticky per-location fallback."""
+    import hashlib
+    folder = Path(folder).resolve()
+    local_root = Path(local_root or Path(os.environ.get('LOCALAPPDATA', str(Path.home()/'AppData/Local')))/'douyin-spark')
+    identity = str(folder).rstrip('\\/').upper()
+    fallback = local_root/'data'/hashlib.sha256(identity.encode('utf-8')).hexdigest()[:16]
+    def probe(path):
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            fd, name = tempfile.mkstemp(prefix='.spark-write-', dir=path)
+            os.close(fd);os.unlink(name)
+            return True
+        except OSError:
+            return False
+    writable = writable or probe
+    if not (fallback/'storage.ready').is_file() and writable(folder):
+        return folder
+    if not writable(fallback):
+        raise RuntimeError('软件目录和本机用户数据目录均不可写，请解压到个人文件夹后重试。')
+    fallback.mkdir(parents=True,exist_ok=True)
+    if not (fallback/'storage.ready').is_file():
+        pending = fallback/'migration.pending'
+        resume = pending.is_file() and pending.read_text('utf-8-sig') == identity
+        if not resume and any(fallback.iterdir()):
+            raise RuntimeError('备用数据目录已有未确认文件，未覆盖：'+str(fallback))
+        import json
+        for name,kind in [('friends.json',list),('config.json',dict)]:
+            source=folder/name
+            if source.is_file() and not isinstance(read_json(source),kind):
+                raise ValueError('原数据格式无效，未创建空配置：'+name)
+        pending.write_text(identity,encoding='utf-8')
+        def copy(source, target):
+            if source.is_symlink() or getattr(source.stat(), 'st_file_attributes',0) & 0x400:
+                raise RuntimeError('数据包含链接，请手动核对后迁移。')
+            if source.is_dir():
+                target.mkdir(exist_ok=True)
+                for child in source.iterdir():
+                    if child.is_dir() and child.name.lower() in {'cache','code cache','gpucache','shadercache','grshadercache','dawngraphitecache','dawnwebgpucache','browsermetrics','crashpad'}:
+                        continue
+                    if child.name.lower() == 'lockfile' or child.name.lower().startswith('singleton') or child.name.lower().endswith('.tmp'):
+                        continue
+                    copy(child,target/child.name)
+            else:
+                shutil.copyfile(source,target)
+        for name in ('friends.json','config.json','following.json','sentences_pool.json','settings.json','conversations.json','conversation_candidates.json','logs','conversation_profile','browser_profile','browser_profile_edge','browser_profile_quark'):
+            if (folder/name).exists():copy(folder/name,fallback/name)
+        (fallback/'storage.ready').write_text(identity,encoding='utf-8')
+        pending.unlink()
+    return fallback
+
+
+def read_json(path):
+    """Accept BOM/trailing commas without modifying punctuation in JSON strings."""
+    import json
+    output=[];quoted=False;escape=False
+    for ch in Path(path).read_text('utf-8-sig'):
+        if not quoted and ch in ']}':
+            i=len(output)-1
+            while i>=0 and output[i].isspace():i-=1
+            if i>=0 and output[i]==',':del output[i]
+        output.append(ch)
+        if quoted:
+            if escape:escape=False
+            elif ch=='\\':escape=True
+            elif ch=='"':quoted=False
+        elif ch=='"':quoted=True
+    return json.loads(''.join(output))
 
 def read_rows(path):
     if not path.exists():

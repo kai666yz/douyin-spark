@@ -11,11 +11,11 @@ namespace DouyinSpark
     {
         static string FindBackend()
         {
-            return new[] { Path.Combine(BaseDir, "spark_backend", "spark_backend.exe"), Path.Combine(BaseDir, "spark_backend.exe") }.FirstOrDefault(File.Exists) ?? "";
+            return new[] { Path.Combine(ProgramDir, "spark_backend", "spark_backend.exe"), Path.Combine(ProgramDir, "spark_backend.exe") }.FirstOrDefault(File.Exists) ?? "";
         }
         static string FindPython()
         {
-            string[] preferred = { Path.Combine(BaseDir, ".venv", "Scripts", "python.exe"), Environment.GetEnvironmentVariable("DOUYIN_SPARK_PYTHON"), Path.Combine(BaseDir, "runtime", "python", "python.exe") };
+            string[] preferred = { Path.Combine(ProgramDir, ".venv", "Scripts", "python.exe"), Environment.GetEnvironmentVariable("DOUYIN_SPARK_PYTHON"), Path.Combine(ProgramDir, "runtime", "python", "python.exe") };
             foreach (string path in preferred) if (!string.IsNullOrEmpty(path) && File.Exists(path)) return path;
             foreach (string folder in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
             {
@@ -49,7 +49,7 @@ namespace DouyinSpark
                 if (string.IsNullOrEmpty(PyExe)) PyExe = FindPython();
                 if (PyExe.Length == 0) throw new FileNotFoundException("缺少运行环境，请完整解压便携包或运行 setup.ps1。");
                 psi.FileName = PyExe;
-                psi.Arguments = QuoteArg(Path.Combine(BaseDir, "douyin_spark.py")) + " " + arguments;
+                psi.Arguments = QuoteArg(Path.Combine(ProgramDir, "douyin_spark.py")) + " " + arguments;
             }
             psi.WorkingDirectory = BaseDir;
             psi.EnvironmentVariables["DOUYIN_SPARK_DATA_DIR"] = BaseDir;

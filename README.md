@@ -1,10 +1,10 @@
 # 抖音续火花 · douyin-spark
 
-Windows 桌面助手，C# WinForms 界面配合内嵌 WebView2 与独立 Playwright 后端，管理好友和群聊。当前版本 **v2.1.1**。
+Windows 桌面助手，C# WinForms 界面配合内嵌 WebView2 与独立 Playwright 后端，管理好友和群聊。当前版本 **v2.2.0**。
 
 ## 界面预览
 
-现代聊天软件布局：左侧导航、中间概览与联系人、右侧详情和消息预览。默认浅灰蓝，也可切换深色；Kitty 仅作为小点缀。截图中的18/23及好友均为测试数据。
+现代聊天软件布局：左侧导航、中间概览与联系人、右侧详情和消息预览。默认浅灰蓝，也可切换深色；Kitty 仅作为小点缀。新增环境状态条和持久定时暂停提示；截图均为测试数据。
 
 ![浅色界面（测试数据）](docs/ui-light.png)
 
@@ -14,6 +14,7 @@ Windows 桌面助手，C# WinForms 界面配合内嵌 WebView2 与独立 Playwri
 
 1. 从 [GitHub Releases](https://github.com/kai666yz/douyin-spark/releases/latest) 下载 Windows x64 ZIP，完整解压。
 2. 双击 `抖音续火花.exe`，保留旁边的整个 `spark_backend` 文件夹。
+   首次启动会显示“环境与数据”。缺少 WebView2 时点击“一键准备”，由包内微软安装器联网安装并复检；无需自己寻找下载文件。已有组件会直接复用。发送浏览器可在该页面选择。
 3. 点击“导入会话”。已有缓存可直接勾选；首次点“登录 / 刷新”，在软件内登录并打开抖音消息列表，再点“读取当前会话”。
 4. 勾选私信好友和群聊后导入。群聊仅用于管理；没有个人主页的私信显示“待补主页”，需核对补齐后才能发送。类型不明的会话需先手动确认。
 5. “设置与更多 → 传统发送浏览器”中选择已安装的 Edge、Chrome 或夸克，复用旧版发送登录。内嵌网页与传统发送登录彼此独立，不复制 Cookie；首次可能分别需要登录。
@@ -22,6 +23,23 @@ Windows 桌面助手，C# WinForms 界面配合内嵌 WebView2 与独立 Playwri
 便携包已含独立 Python/Playwright 后端及 WebView2 SDK 组件，无需另装 Python、豆包或下载 Playwright 浏览器内核。需要 Windows 10/11、.NET Framework 4.6.2+（推荐4.8），内嵌导入还需 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。传统发送需要上述已安装浏览器之一。
 
 旧版迁移时先退出旧程序，保留自己的 `friends.json`、`config.json`、`conversations.json`、`conversation_candidates.json`、`conversation_profile`、对应 `browser_profile*` 和 `logs`。不要用下载包的空名单覆盖自己的名单。
+
+### v2.2 数据目录与定时保护
+
+- 程序目录可写时继续使用便携模式。不可写时，复制可读取的名单、配置、历史和专用profile到 `%LOCALAPPDATA%\douyin-spark\data\<位置标识>`，原文件保留；迁移未完成会报错，不能把空名单当成功。不同程序位置的备用目录隔离。
+- 完成回退后继续复用该用户目录，即使原目录权限恢复，也不切回旧数据。前后端共用相同定位规则；后端程序与JS资源仍从软件目录读取。
+- “环境与数据”及“设置与更多 → 环境检查 / 数据位置”显示实际数据目录，可直接打开。移动整个便携目录时保留 `startup_state.json`；跨电脑或账户登录可能需要重新验证。
+- 首次升级确认、运行位置或账户环境变化时，已有定时持久暂停。关闭提示或重启都不会自动恢复；在定时设置中“保存启用”后等待下一次时间，错过的任务不立即补发。休眠后错过一分钟执行窗口也跳过；同一天的定时尝试记录在派发前保存，重启不重复触发。
+- 仅修复**已经启用**的开机自启路径，未启用时不创建自启项。移动一个只读程序目录后，数据仍保留在原备用目录；请从旧“数据位置”备份个人文件到新位置，不要用空名单覆盖已有文件。
+- 独立后端已从Python 3.10.6升级到3.12.14，无需用户安装Python；固定Playwright 1.64.1。系统WebView2由微软Evergreen维护，软件不卸载或擅自替换系统浏览器。实际构建版本记录在包内`runtime-versions.json`。
+
+![环境与数据（测试数据）](docs/environment.png)
+
+### 首次下载与系统提示
+
+当前桌面程序尚未进行商业代码签名，部分电脑可能提示未知发布者或阻止启动。请仅从本仓库Releases下载，并核对发布页SHA256与包内`SHA256SUMS.json`。不要为运行软件关闭杀毒软件；不确认来源时不要绕过系统拦截。系统是否提示取决于具体电脑，本地测试无法保证。
+
+包内WebView2引导安装器来自[微软官方分发方案](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution)，已在构建时检查微软数字签名，并固定SHA256；运行时再次校验。点击“一键准备”才会执行，需联网下载实际Runtime；离线电脑可以先使用名单和历史功能，不宣称全离线零依赖。
 
 ### 会话导入与登录保留
 

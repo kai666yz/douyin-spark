@@ -20,7 +20,7 @@ namespace DouyinSpark
         }
         static void SaveAllConfig(string browser,string schedule)
         {
-            var config=ReadConfig(); config["browser"]=browser; config["schedule"]=schedule; config["message"]=fixedMessage;
+            var config=ReadConfig(); config["browser"]=browser; config["schedule"]=schedule; config["message"]=fixedMessage;config["schedule_paused"]=schedulePaused;
             SparkStorage.WriteJson(Path.Combine(BaseDir,"config.json"),config);
         }
         static string ConfigString(string key)

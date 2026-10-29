@@ -39,6 +39,7 @@ namespace DouyinSpark
             actionsMenu.Items.Add("预览本轮消息",null,delegate{DoDry();});
             actionsMenu.Items.Add("定时设置",null,delegate{ShowScheduleDialog();RefreshDashboard();});
             actionsMenu.Items.Add("开机自启",null,delegate{ToggleAutostart();});
+            actionsMenu.Items.Add("环境检查 / 数据位置",null,delegate{ShowEnvironment();});
             actionsMenu.Items.Add(new ToolStripSeparator());
             actionsMenu.Items.Add("传统发送浏览器",null,delegate{ShowBrowserDialog();});
             actionsMenu.Items.Add("传统浏览器登录自检",null,delegate{DoLogin();});
@@ -50,12 +51,14 @@ namespace DouyinSpark
             var footer=new FlowLayoutPanel {Dock=DockStyle.Bottom,Height=162,FlowDirection=FlowDirection.TopDown,WrapContents=false,Tag="sidebar"};
             var kitty=new KittyBadge {Size=new Size(22,22),Margin=new Padding(8,0,0,8)};
             footer.Controls.AddRange(new Control[]{kitty,themeButton,update,lblStatus});navPanel.Controls.AddRange(new Control[]{logo,subtitle,nav,footer});shell.Controls.Add(navPanel,0,0);
-            var middle=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(22,22,16,20),Tag="canvas",Margin=Padding.Empty};
-            middle.RowStyles.Add(new RowStyle(SizeType.Absolute,60));middle.RowStyles.Add(new RowStyle(SizeType.Absolute,158));middle.RowStyles.Add(new RowStyle(SizeType.Absolute,48));middle.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.Controls.Add(middle,1,0);
+            var middle=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Padding=new Padding(22,22,16,20),Tag="canvas",Margin=Padding.Empty};
+            middle.RowStyles.Add(new RowStyle(SizeType.Absolute,68));middle.RowStyles.Add(new RowStyle(SizeType.Absolute,46));middle.RowStyles.Add(new RowStyle(SizeType.Absolute,158));middle.RowStyles.Add(new RowStyle(SizeType.Absolute,48));middle.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.Controls.Add(middle,1,0);
             var heading=new Panel {Dock=DockStyle.Fill,Tag="canvas"};var title=ViewLabel("联系人",19,true);title.SetBounds(0,0,210,32);var desc=ViewLabel("私信与群聊，一处管理",9,false,true);desc.SetBounds(1,36,280,22);heading.Controls.AddRange(new Control[]{title,desc});middle.Controls.Add(heading,0,0);
+            var environmentButton=new RoundButton{Text="环境与数据",IconName="stats",Primary=false,Size=new Size(136,34),Dock=DockStyle.Right,Font=AppPalette.Font(9)};environmentButton.Click+=delegate{ShowEnvironment();};heading.Controls.Add(environmentButton);
+            readiness=new ReadinessCard{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,6)};readiness.Click+=delegate{if(schedulePaused)ShowScheduleDialog();else ShowEnvironment();RefreshEnvironmentBanner();};middle.Controls.Add(readiness,0,1);
             overview=new OverviewCard {Compact=true,Dock=DockStyle.Fill,Margin=new Padding(0,0,0,10)};
-            btnStart=new RoundButton {Text="发送全部私信",IconName="play",Primary=true,CornerRadius=12,Font=AppPalette.Font(10,true)};btnStart.Click+=delegate{DoStart();};btnStart.EnabledChanged+=delegate{btnStart.Text=btnStart.Enabled?"发送全部私信":"正在发送…";};overview.StartButton=btnStart;overview.Controls.Add(btnStart);middle.Controls.Add(overview,0,1);
-            progress=new SparkProgress {Dock=DockStyle.Fill,Margin=new Padding(0,2,0,8)};middle.Controls.Add(progress,0,2);
+            btnStart=new RoundButton {Text="发送全部私信",IconName="play",Primary=true,CornerRadius=16,Font=AppPalette.Font(10,true)};btnStart.Click+=delegate{DoStart();};btnStart.EnabledChanged+=delegate{btnStart.Text=btnStart.Enabled?"发送全部私信":"正在发送…";};overview.StartButton=btnStart;overview.Controls.Add(btnStart);middle.Controls.Add(overview,0,2);
+            progress=new SparkProgress {Dock=DockStyle.Fill,Margin=new Padding(0,2,0,8)};middle.Controls.Add(progress,0,3);
             var listCard=new CardSurface {Dock=DockStyle.Fill,Margin=Padding.Empty,Padding=new Padding(8,12,8,8)};
             var listLayout=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4};
             listLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,36));listLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,38));listLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,36));listLayout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
@@ -70,7 +73,7 @@ namespace DouyinSpark
             roster=new RosterList {Dock=DockStyle.Fill,Margin=Padding.Empty};roster.SelectedIndexChanged+=delegate{if(!refreshingRoster)ShowRosterDetail();};
             var rosterMenu=new ContextMenuStrip();rosterMenu.Items.Add("移出名单",null,delegate{RemoveRosterItem();});roster.ContextMenuStrip=rosterMenu;
             roster.MouseDown+=delegate(object sender,MouseEventArgs e){if(e.Button==MouseButtons.Right){int i=roster.IndexFromPoint(e.Location);if(i>=0)roster.SelectedIndex=i;}};
-            var listHost=new Panel {Dock=DockStyle.Fill};rosterEmpty=ViewLabel("还没有联系人\r\n点击右上角“导入”选择私信或群聊",10,false,true);rosterEmpty.Dock=DockStyle.Fill;rosterEmpty.TextAlign=ContentAlignment.MiddleCenter;listHost.Controls.Add(roster);listHost.Controls.Add(rosterEmpty);listLayout.Controls.Add(listHost,0,3);listCard.Controls.Add(listLayout);middle.Controls.Add(listCard,0,3);
+            var listHost=new Panel {Dock=DockStyle.Fill};rosterEmpty=ViewLabel("还没有联系人\r\n点击右上角“导入”选择私信或群聊",10,false,true);rosterEmpty.Dock=DockStyle.Fill;rosterEmpty.TextAlign=ContentAlignment.MiddleCenter;listHost.Controls.Add(roster);listHost.Controls.Add(rosterEmpty);listLayout.Controls.Add(listHost,0,3);listCard.Controls.Add(listLayout);middle.Controls.Add(listCard,0,4);
             var right=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(6,22,18,20),Margin=Padding.Empty,Tag="canvas"};
             right.RowStyles.Add(new RowStyle(SizeType.Absolute,138));right.RowStyles.Add(new RowStyle(SizeType.Absolute,226));right.RowStyles.Add(new RowStyle(SizeType.Percent,100));right.RowStyles.Add(new RowStyle(SizeType.Absolute,108));shell.Controls.Add(right,2,0);
             var identity=new CardSurface {Dock=DockStyle.Fill,Margin=new Padding(0,0,0,10),Padding=new Padding(16)};
@@ -87,7 +90,7 @@ namespace DouyinSpark
             emptyHistory=new EmptyHistory();tableBody.Controls.Add(dgv);tableBody.Controls.Add(emptyHistory);history.Controls.Add(tableBody);history.Controls.Add(hHead);right.Controls.Add(history,0,2);
             var run=new CardSurface {Dock=DockStyle.Fill,Margin=Padding.Empty,Padding=new Padding(12)};var runTitle=ViewLabel("运行动态",9,true);runTitle.Dock=DockStyle.Top;runTitle.Height=26;txtLog=new RichTextBox {Dock=DockStyle.Fill,ReadOnly=true,BorderStyle=BorderStyle.None,Font=AppPalette.Font(8),Tag="placeholder",Text="先导入会话，再核对消息。"};run.Controls.Add(txtLog);run.Controls.Add(runTitle);right.Controls.Add(run,0,3);
             overviewTimer=new System.Windows.Forms.Timer {Interval=2000};overviewTimer.Tick+=delegate{if(form.Visible||!btnStart.Enabled){RefreshDashboard();if(!btnStart.Enabled)LoadLogs();}};overviewTimer.Start();form.Activated+=delegate{RefreshDashboard();};form.FormClosed+=delegate{overviewTimer.Dispose();actionsMenu.Dispose();};
-            AppPalette.Apply(form);RefreshDashboard();RefreshRoster();return form;
+            AppPalette.Apply(form);RefreshDashboard();RefreshRoster();RefreshEnvironmentBanner();return form;
         }
         static void SetRosterFilter(string value){rosterFilter=value;filterAll.Selected=value=="all";filterPrivate.Selected=value=="private";filterGroup.Selected=value=="group";filterAll.Invalidate();filterPrivate.Invalidate();filterGroup.Invalidate();RefreshRoster();}
         static void RefreshRoster()

@@ -12,6 +12,9 @@ ui_profile*/
 conversation_profile*/
 conversations.json
 conversation_candidates.json
+startup_state.json
+storage.ready
+migration.pending
 vendor/
 logs/
 *.log

@@ -22,9 +22,7 @@ namespace DouyinSpark
         static Label lblStatus;
         static SparkProgress progress;
         static string scheduleTime = "";     // 每日定时 "HH:mm"
-        static bool scheduleFired = false;   // 当天是否已触发
-        static string scheduleLastDay = "";  // 上次触发的日期
-        const string AppVersion = "2.1.1";
+        const string AppVersion = "2.2.0";
 
         // HelloKitty 主题别名（Program 内直接使用）
         static readonly Color KPink = KittyTheme.KPink;
@@ -35,7 +33,7 @@ namespace DouyinSpark
         static readonly Color KPinkLine = KittyTheme.KPinkLine;
         static readonly Color KPinkText = KittyTheme.KPinkText;
         static void PaintKittyFace(Graphics g, float cx, float cy, float s) { KittyTheme.PaintKittyFace(g, cx, cy, s); }
-        static string CrashLogPath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "crash.log"); } }
+        static string CrashLogPath { get { return Path.Combine(BaseDir, "logs", "crash.log"); } }
 
         static void InstallGlobalErrorCatch()
         {
@@ -75,10 +73,14 @@ namespace DouyinSpark
                 MessageBox.Show("抖音续火花已在运行，请勿重复打开。");
                 return;
             }
-            PyExe = FindPython();
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            try { PrepareStorageWithProgress(); }
+            catch(Exception ex) { MessageBox.Show("数据目录准备未完成，原数据已保留。\n"+ex.Message,"启动检查");return; }
+            PyExe = FindBackend().Length>0 ? "" : FindPython();
             if (string.IsNullOrEmpty(PyExe) && FindBackend().Length == 0)
             {
-                MessageBox.Show("没有找到 Python。请先运行 setup.ps1，或安装 Python 并加入 PATH。");
+                MessageBox.Show("没有找到配套后端。请重新完整解压便携包，并保留 spark_backend 文件夹。源码用户可运行 setup.ps1。");
                 return;
             }
             string friendsFile = Path.Combine(BaseDir, "friends.json");
@@ -87,8 +89,9 @@ namespace DouyinSpark
 
             try { fixedMessage=ConfigString("message"); } catch(Exception ex) { MessageBox.Show("配置无法读取，原文件已保留："+ex.Message); return; }
 
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
+            scheduleTime=LoadSchedule();nextScheduled=SchedulePolicy.Next(DateTime.Now,scheduleTime);
+            if(startupReview||DependenciesMissing()||args.Contains("--check-environment"))ShowEnvironment();
+            environmentReady=!DependenciesMissing();
 
             var form=BuildMainWindow();
 
@@ -104,7 +107,8 @@ namespace DouyinSpark
             LoadLogs();
             // 启动时恢复上次保存的每日定时（重启后无需重新设置）
             scheduleTime = LoadSchedule();
-            if (!string.IsNullOrEmpty(scheduleTime)) Log("已恢复每日定时：每天 " + scheduleTime + " 自动发送");
+            if (!string.IsNullOrEmpty(scheduleTime)) Log(schedulePaused?"已有定时已暂停，请在定时设置中确认后启用。":"已恢复每日定时，等待下一次计划时间，不补发已错过的任务。");
+            RepairAutostart();
             UpdateStatus();
             // 启动自检：关键配套文件缺失时给出警告（被杀软误删后能及时发现）
             try
@@ -120,27 +124,7 @@ namespace DouyinSpark
             schedTimer.Interval = 5000;
             schedTimer.Tick += delegate
             {
-                if (string.IsNullOrEmpty(scheduleTime)) return;
-                string today = DateTime.Now.ToString("yyyy-MM-dd");
-                if (scheduleLastDay != today) { scheduleLastDay = today; scheduleFired = false; }
-                if (scheduleFired) return;
-                string now = DateTime.Now.ToString("HH:mm");
-                if (now == scheduleTime)
-                {
-                    scheduleFired = true;
-                    Log("定时触发，自动开始发送...");
-                    DoStart();
-                }
-                else if (string.CompareOrdinal(now, scheduleTime) > 0)
-                {
-                    // 已过设定时间：今天还没发过就补发一次，发过就标记防重复
-                    scheduleFired = true;
-                    if (!LogHasTodayOk())
-                    {
-                        Log("定时时间已过，自动补发...");
-                        DoStart();
-                    }
-                }
+                TickSchedule(DateTime.Now);
             };
             schedTimer.Start();
             SetupTray(form,minimized);
@@ -286,7 +270,7 @@ namespace DouyinSpark
         static void UpdateStatus()
         {
             if (string.IsNullOrEmpty(scheduleTime)) lblStatus.Text = "● 就绪";
-            else lblStatus.Text = "● 定时 " + scheduleTime + " 每日自动";
+            else lblStatus.Text = schedulePaused?"● 定时已暂停":"● 定时 " + scheduleTime + " 每日自动";
             lblStatus.ForeColor = AppPalette.Muted;
             RefreshDashboard();
         }
@@ -294,34 +278,35 @@ namespace DouyinSpark
         static void ShowScheduleDialog()
         {
             var dlg = new ThemedForm();
-            dlg.Text = "每日定时"; dlg.Size = new Size(330, 200);
+            dlg.Text = "每日定时"; dlg.Size = new Size(410, 230);
             dlg.StartPosition = FormStartPosition.CenterParent; dlg.BackColor = Color.White;
             dlg.FormBorderStyle = FormBorderStyle.FixedDialog; dlg.MaximizeBox = false; dlg.MinimizeBox = false;
             var l1 = new Label(); l1.Text = "每天自动发送时间（HH:mm）："; l1.Location = new Point(22, 22); l1.AutoSize = true;
             var t1 = new TextBox(); t1.Text = scheduleTime; t1.Location = new Point(22, 50); t1.Size = new Size(270, 25);
-            var l2 = new Label(); l2.Text = "留空保存 = 取消定时。到点自动开始续火花。"; l2.Location = new Point(22, 82); l2.AutoSize = true; l2.ForeColor = Color.Gray; l2.Font = new Font("Microsoft YaHei UI", 8F);
-            var b1 = new RoundButton(); b1.Text = "保存"; b1.Size = new Size(95, 32); b1.Location = new Point(65, 120);
+            var l2 = new Label(); l2.Text = (schedulePaused?"当前已暂停。保存后明确启用。\n":"")+"留空取消；只执行下一次定时，不立即补发。"; l2.Location = new Point(22, 82); l2.AutoSize = true; l2.ForeColor = Color.Gray; l2.Font = new Font("Microsoft YaHei UI", 8F);
+            var b1 = new RoundButton(); b1.Text = "保存启用"; b1.Size = new Size(95, 32); b1.Location = new Point(65, 145);
             b1.MainColor = KPink; b1.HoverColor = Color.FromArgb(255, 92, 138); b1.ForeColor = Color.White;
             b1.Click += delegate
             {
                 string v = t1.Text.Trim();
-                if (v.Length == 0) { scheduleTime = ""; scheduleFired = true; SaveAllConfig(GetBrowserChoice(), ""); dlg.Close(); Log("已取消定时"); UpdateStatus(); return; }
+                if (v.Length == 0) { scheduleTime = ""; schedulePaused=false; nextScheduled=DateTime.MaxValue; SaveAllConfig(GetBrowserChoice(), ""); dlg.Close(); Log("已取消定时"); UpdateStatus();RefreshEnvironmentBanner(); return; }
                 DateTime dt;
-                if (DateTime.TryParse(v, out dt))
+                if (DateTime.TryParseExact(v,"HH:mm",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out dt))
                 {
                     scheduleTime = dt.ToString("HH:mm");
-                    scheduleFired = false;
-                    scheduleLastDay = "";
+                    schedulePaused=false;
+                    nextScheduled=SchedulePolicy.Next(DateTime.Now,scheduleTime);
                     SaveAllConfig(GetBrowserChoice(), scheduleTime);
                     dlg.Close();
-                    Log("定时已设置：每天 " + scheduleTime + " 自动发送");
+                    Log("定时已启用：下次 "+nextScheduled.ToString("MM-dd HH:mm")+"，不立即补发。");RefreshEnvironmentBanner();
                     UpdateStatus();
                 }
                 else { MessageBox.Show("时间格式不对，请填 HH:mm，如 08:30"); }
             };
-            var b2 = new RoundButton(); b2.Text = "取消"; b2.Size = new Size(95, 32); b2.Location = new Point(170, 120);
+            var b2 = new RoundButton(); b2.Text = "取消"; b2.Size = new Size(95, 32); b2.Location = new Point(170, 145);
             b2.MainColor = Color.FromArgb(60, 60, 70); b2.HoverColor = Color.FromArgb(80, 80, 90); b2.ForeColor = Color.White;
             b2.Click += delegate { dlg.Close(); };
+            var pause=new RoundButton{Text="暂停",Primary=false,Size=new Size(95,32),Location=new Point(275,145)};pause.Click+=delegate{schedulePaused=true;SaveAllConfig(GetBrowserChoice(),scheduleTime);UpdateStatus();RefreshDashboard();RefreshEnvironmentBanner();dlg.Close();};dlg.Controls.Add(pause);
             dlg.Controls.Add(l1); dlg.Controls.Add(t1); dlg.Controls.Add(l2); dlg.Controls.Add(b1); dlg.Controls.Add(b2);
             dlg.ShowDialog();
         }
@@ -452,6 +437,7 @@ namespace DouyinSpark
 
         static void DoStart()
         {
+            if(BrowserPath(GetBrowserChoice()).Length==0){Log("发送浏览器未找到，请先完成环境检查。");ShowEnvironment();return;}
             if(importingFollowing!=0) { Log("正在读取关注列表，定时/发送任务请等待导入结束后再试。"); return; }
             if (btnStart.Enabled == false) { Log("正在运行中，稍等..."); return; }
             if (IsProfileLocked())
