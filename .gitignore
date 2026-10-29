@@ -1,0 +1,38 @@
+# Private local data
+friends.json
+config.json
+following.json
+spark_log.csv
+browser_profile*/
+wv_profile*/
+ui_profile*/
+logs/
+*.log
+run_out.txt
+run_err.txt
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Environments / builds / temporary updates
+.venv/
+venv/
+runtime/
+__pycache__/
+*.py[cod]
+*.exe
+*.dll
+*.pdb
+*.zip
+update/
+backups/
+dist/
+build/
+
+# Editors / OS
+.vs/
+.idea/
+Thumbs.db
+Desktop.ini
