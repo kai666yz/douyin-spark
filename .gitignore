@@ -12,6 +12,7 @@ ui_profile*/
 conversation_profile*/
 conversations.json
 conversation_candidates.json
+group_task.json
 startup_state.json
 storage.ready
 migration.pending

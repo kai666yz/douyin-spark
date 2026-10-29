@@ -18,6 +18,7 @@ namespace DouyinSpark
         static bool schedulePaused;
         static DateTime nextScheduled=DateTime.MaxValue;
         static string scheduleLastTrigger="";
+        static DateTime privateQueueUntil=DateTime.MinValue;
         static bool startupReview;
         static bool ConfigBool(string key){return string.Equals(ConfigString(key),"true",StringComparison.OrdinalIgnoreCase);}
         static void PrepareStorageWithProgress()
@@ -47,10 +48,12 @@ namespace DouyinSpark
             string identity=DataLocation.Hash(DataLocation.Normalize(ProgramDir)+"|"+DataLocation.Normalize(BaseDir)+"|"+Environment.MachineName+"|"+WindowsIdentity.GetCurrent().User.Value);
             var config=ReadConfig();dataLocation.Changed=SchedulePolicy.Review(config,identity,previous);
             SparkStorage.WriteJson(configPath,config);
+            if(dataLocation.Changed&&File.Exists(Path.Combine(BaseDir,"group_task.json"))){var groups=GroupTaskSettings.Read(BaseDir);groups.paused=true;groups.Save(BaseDir);}
             // The paused flag is committed before acknowledging this location.
             SparkStorage.WriteJson(statePath,new Dictionary<string,string>{{"identity",identity},{"review_version",version}});
             startupReview=dataLocation.Changed||version!=AppVersion;
             schedulePaused=ConfigBool("schedule_paused");scheduleLastTrigger=ConfigString("schedule_last_trigger_date");
+            ReloadGroupTask();
         }
         static void MarkStartupReviewed()
         {
@@ -81,11 +84,12 @@ namespace DouyinSpark
         }
         static void TickSchedule(DateTime now)
         {
-            if(schedulePaused||string.IsNullOrEmpty(scheduleTime)||nextScheduled==DateTime.MaxValue||now<nextScheduled)return;
-            bool due=SchedulePolicy.Due(now,nextScheduled,schedulePaused,scheduleLastTrigger);
-            nextScheduled=SchedulePolicy.Next(now,scheduleTime);
-            if(!due){Log("已跳过错过的定时，等待下一次计划时间。");return;}
-            if(!btnStart.Enabled||importingFollowing!=0){Log("当前任务尚未结束，本次定时已跳过。");return;}
+            if(schedulePaused||string.IsNullOrEmpty(scheduleTime)||nextScheduled==DateTime.MaxValue)return;
+            if(now>=nextScheduled){bool due=SchedulePolicy.Due(now,nextScheduled,schedulePaused,scheduleLastTrigger);nextScheduled=SchedulePolicy.Next(now,scheduleTime);if(due)privateQueueUntil=now.AddMinutes(10);else Log("已跳过错过的定时，等待下一次计划时间。");}
+            if(privateQueueUntil==DateTime.MinValue)return;
+            if(now>privateQueueUntil){privateQueueUntil=DateTime.MinValue;Log("私信定时排队超过10分钟，本次跳过。");return;}
+            if(!btnStart.Enabled||importingFollowing!=0||groupTaskRunning)return;
+            privateQueueUntil=DateTime.MinValue;
             if(BrowserPath(GetBrowserChoice()).Length==0){Log("定时未发送：发送浏览器不可用，请打开环境与数据检查。");return;}
             // Persist before dispatch so a restart cannot repeat today's attempt.
             var config=ReadConfig();config["schedule_last_trigger_date"]=now.ToString("yyyy-MM-dd");SparkStorage.WriteJson(Path.Combine(BaseDir,"config.json"),config);scheduleLastTrigger=now.ToString("yyyy-MM-dd");

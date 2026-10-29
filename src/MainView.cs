@@ -16,6 +16,13 @@ namespace DouyinSpark
         static RoundButton themeButton;
         static System.Windows.Forms.Timer overviewTimer;
         static ContextMenuStrip actionsMenu;
+        static bool groupOverview;
+        static RoundButton btnGroup,todayPrivate,todayGroups;
+        static void SetOverview(bool groups)
+        {
+            groupOverview=groups;todayPrivate.Selected=!groups;todayGroups.Selected=groups;todayPrivate.Invalidate();todayGroups.Invalidate();
+            overview.GroupMode=groups;btnStart.Visible=!groups;btnGroup.Visible=groups;RefreshDashboard();
+        }
 
         static Label ViewLabel(string text,float size=10,bool bold=false,bool muted=false)
         {
@@ -46,8 +53,9 @@ namespace DouyinSpark
                 overview.NextText=schedulePaused&&!string.IsNullOrEmpty(scheduleTime)?"定时已暂停 · 等待确认":DateTime.TryParseExact(scheduleTime,"HH:mm",System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out when)
                     ? "下次定时 · "+(DateTime.Now.TimeOfDay<when.TimeOfDay?"今天 ":"明天 ")+scheduleTime : "尚未设置定时";
                 overview.ModeText=fixedMessage.Length>0?"固定消息":"分类语录";
+                if(groupOverview){var attempts=GroupJournal.Read(BaseDir,DateTime.Now);overview.Summary=GroupSummary.Build(groupPlan.targets.Union(attempts.Select(x=>x.group_id)),attempts,DateTime.Now);overview.NextText=string.IsNullOrEmpty(groupPlan.schedule)?"尚未设置群聊定时":groupPlan.paused?"群聊定时已暂停":"群聊每日 · "+groupPlan.schedule;overview.ModeText="独立群聊消息";}
                 overview.AccessibleName="今日已处理 "+overview.Summary.Processed+" / "+overview.Summary.Total+"，成功 "+overview.Summary.Succeeded+"，失败 "+overview.Summary.Failed+"，待发 "+overview.Summary.Pending+"，待确认 "+overview.Summary.Unconfirmed+"。"+overview.NextText;
-                overview.Invalidate();RefreshRoster();
+                overview.Invalidate();RefreshRoster();RefreshTaskWorkspace();
             }
             catch(Exception){overview.NextText="记录正在更新…";overview.Invalidate();}
         }

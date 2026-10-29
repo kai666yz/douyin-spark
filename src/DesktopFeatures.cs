@@ -38,7 +38,7 @@ namespace DouyinSpark
         }
         static void SetupTray(Form form,bool minimized)
         {
-            tray=new NotifyIcon {Text="抖音续火花",Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath),Visible=true};
+            tray=new NotifyIcon {Text="抖音续火花",Icon=File.Exists(Path.Combine(ProgramDir,"icon.ico"))?new Icon(Path.Combine(ProgramDir,"icon.ico")):Icon.ExtractAssociatedIcon(Application.ExecutablePath),Visible=true};
             var menu=new ContextMenuStrip();
             Action restore=delegate {form.Show();form.WindowState=FormWindowState.Normal;form.Activate();};
             menu.Items.Add("显示窗口",null,delegate {restore();});

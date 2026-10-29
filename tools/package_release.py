@@ -33,7 +33,7 @@ def main():
         shutil.copy2(bootstrapper,stage/'runtime'/bootstrapper.name)
         if (ROOT/'docs').is_dir():
             (stage/'docs').mkdir()
-            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png'):
+            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png','ui-tasks.png','ui-settings.png','ui-group-task.png','spark-icon.png'):
                 if (ROOT/'docs'/name).is_file():shutil.copy2(ROOT/'docs'/name,stage/'docs'/name)
         pool=json.loads((ROOT/'sentences_pool.json').read_text('utf-8-sig'))
         # Never publish local custom messages or a personal category selection.
@@ -73,18 +73,20 @@ def main():
 本软件当前未签名。请核对 GitHub 官方来源及 SHA256；不信任来源时不要绕过系统拦截。
 日常浏览器、旧版发送浏览器、内嵌网页的登录状态彼此独立，不会复制或覆盖。
 可直接选择上次读取的会话；新会话点登录/刷新，在软件内打开消息后读取。
-群聊仅加入管理名单，不参与发送；未取得个人主页的私信需补齐后才可发送。
+群聊可在消息任务中独立选择、填写消息及启用定时；不会混入私信发送。
+今日私信和今日群聊可切换查看，群聊采用独立窗口。任务可同时启用，执行时顺序排队。
+群聊网页提交仅记为待核对，不等于送达；结果不确定不自动重发，已有草稿保留。
 本包的好友名单为空，不含任何登录状态。旧版关注导入及手动添加入口保留。
 读取时可取消；失败、空结果和部分结果不覆盖关注缓存，更不会覆盖原好友名单。
 部分结果需确认后勾选导入，未读取成功可查看诊断或手动添加。
-固定消息：设置与更多 → 统一固定消息。留空则使用语录池。
+私信固定消息：消息任务 → 私信问候 → 消息内容。留空则使用语录池。
 托盘：最小化或关闭窗口后继续在托盘运行；右键托盘选择退出。
-历史：设置与更多 → 导出历史 CSV / 清理旧历史。清理前备份并保留今日去重记录。
+历史：设置 → 数据与记录。群聊发送记录独立核对及导出CSV。
 验证码需在浏览器中手动处理；程序不会自动解验证码或切换身份规避验证。
 检查更新连接 GitHub Releases，确认后打开下载页，不自动覆盖个人数据。
 
 从旧版迁移：先关闭旧程序。保留 friends.json、config.json、conversations.json、
-conversation_candidates.json、conversation_profile、对应 browser_profile* 和 logs，
+conversation_candidates.json、group_task.json、startup_state.json、conversation_profile、对应 browser_profile* 和 logs，
 保留旧目录作为备份。不要用本包的空名单覆盖自己的名单。
 完整功能和源码构建方法见 README.md。
 '''

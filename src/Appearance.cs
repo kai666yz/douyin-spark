@@ -9,13 +9,13 @@ namespace DouyinSpark
     static class AppPalette
     {
         public static bool Dark;
-        public static Color Canvas {get{return Dark?Color.FromArgb(28,32,39):Color.FromArgb(244,246,249);}}
-        public static Color Sidebar {get{return Dark?Color.FromArgb(33,38,47):Color.FromArgb(232,236,243);}}
+        public static Color Canvas {get{return Dark?Color.FromArgb(24,30,40):Color.FromArgb(244,248,253);}}
+        public static Color Sidebar {get{return Dark?Color.FromArgb(29,37,50):Color.FromArgb(233,242,254);}}
         public static Color Surface {get{return Dark?Color.FromArgb(39,44,53):Color.White;}}
         public static Color Soft {get{return Dark?Color.FromArgb(46,59,78):Color.FromArgb(233,239,250);}}
         public static Color Stripe {get{return Dark?Color.FromArgb(44,50,61):Color.FromArgb(248,250,253);}}
-        public static Color Accent {get{return Dark?Color.FromArgb(146,177,226):Color.FromArgb(77,113,182);}}
-        public static Color AccentDeep {get{return Dark?Color.FromArgb(177,200,237):Color.FromArgb(58,90,154);}}
+        public static Color Accent {get{return Dark?Color.FromArgb(137,184,244):Color.FromArgb(62,123,218);}}
+        public static Color AccentDeep {get{return Dark?Color.FromArgb(179,207,248):Color.FromArgb(42,99,190);}}
         public static Color Text {get{return Dark?Color.FromArgb(234,238,244):Color.FromArgb(34,44,59);}}
         public static Color Muted {get{return Dark?Color.FromArgb(164,177,195):Color.FromArgb(106,118,138);}}
         public static Color Border {get{return Dark?Color.FromArgb(62,70,84):Color.FromArgb(226,231,238);}}

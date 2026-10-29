@@ -16,7 +16,7 @@ namespace DouyinSpark
         static string ConversationsPath {get{return Path.Combine(BaseDir,"conversations.json");}}
         static void StartConversationImport()
         {
-            if(!btnStart.Enabled || importingFollowing!=0){MessageBox.Show(mainForm,"请等当前发送或读取任务结束后再导入会话。","导入会话");return;}
+            if(!btnStart.Enabled || importingFollowing!=0||groupTaskOpen){MessageBox.Show(mainForm,"请先结束发送，并关闭群聊网页窗口后再导入会话。","导入会话");return;}
             importingFollowing=1;
             try{using(var dialog=new ConversationImportForm(BaseDir)){dialog.ShowDialog(mainForm);}LoadLogs();RefreshRoster();}
             catch(Exception ex){MessageBox.Show(mainForm,"会话导入未完成，原名单已保留。\n"+ex.Message,"导入会话");}
@@ -42,7 +42,7 @@ namespace DouyinSpark
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute,72));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,46));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,64));
             var header=new Panel {Dock=DockStyle.Fill};
             var title=new Label {Text="选择你想保持联系的人",Font=AppPalette.Font(17,true),AutoSize=true,Location=new Point(0,0)};
-            var subtitle=new Label {Text="复用软件内登录；只读取会话名称与标识，不保存聊天正文。群聊仅加入管理名单。",Font=AppPalette.Font(9),AutoSize=true,Location=new Point(1,38),Tag="muted"};
+            var subtitle=new Label {Text="复用软件内登录；只读取会话名称与标识。群聊导入后，可在消息任务中独立设置。",Font=AppPalette.Font(9),AutoSize=true,Location=new Point(1,38),Tag="muted"};
             header.Controls.AddRange(new Control[]{title,subtitle});layout.Controls.Add(header,0,0);
             var tools=new FlowLayoutPanel {Dock=DockStyle.Fill,WrapContents=false};
             login=new RoundButton {Text="登录 / 刷新",Primary=false,Size=new Size(120,36),Margin=new Padding(0,0,8,0)};
@@ -204,7 +204,7 @@ namespace DouyinSpark
                 int count=ConversationStore.Merge(Path.Combine(root,"conversations.json"),selected);
                 var privateFriends=selected.Where(x=>x.CanSend).Select(x=>new FriendRecord {name=x.name,url=x.url}).ToList();
                 if(privateFriends.Count>0)SparkStorage.AddFriends(Path.Combine(root,"friends.json"),privateFriends);
-                MessageBox.Show(this,"已加入 "+count+" 个新会话。\n群聊及待补主页的私信只用于管理，不进入发送任务。","导入完成");Close();
+                MessageBox.Show(this,"已加入 "+count+" 个新会话。\n群聊请在消息任务中独立设置；待补主页的私信暂不发送。导入本身不会发送消息。","导入完成");Close();
             }catch(Exception ex){MessageBox.Show(this,ex.Message,"未完成导入");}
         }
     }

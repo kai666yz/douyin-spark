@@ -28,7 +28,7 @@ def main():
     versions=json.loads((root/'runtime-versions.json').read_text('utf-8'))
     assert json.loads((root/'friends.json').read_text('utf-8'))==[]
     assert json.loads((root/'config.json').read_text('utf-8'))=={'browser':'msedge','schedule':'','message':''}
-    for name in ['logs','startup_state.json','conversations.json','conversation_candidates.json','conversation_profile','browser_profile','browser_profile_edge','browser_profile_quark']:
+    for name in ['logs','startup_state.json','group_task.json','conversations.json','conversation_candidates.json','conversation_profile','browser_profile','browser_profile_edge','browser_profile_quark']:
         assert not (root/name).exists(),name
     assert hashlib.sha256((root/'runtime/MicrosoftEdgeWebview2Setup.exe').read_bytes()).hexdigest()=='13f6d9cdc8c3e7186e4b180db7f48e199ee97d631480e8391fb3106f338fb21a'
     env=dict(os.environ)

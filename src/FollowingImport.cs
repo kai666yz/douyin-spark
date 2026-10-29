@@ -34,7 +34,7 @@ namespace DouyinSpark
         static int importingFollowing;
         static void StartFollowingImport()
         {
-            if(!btnStart.Enabled) { MessageBox.Show(mainForm,"发送任务正在运行，请等结束后再读取关注列表。","添加好友"); return; }
+            if(!btnStart.Enabled||groupTaskRunning) { MessageBox.Show(mainForm,"发送任务正在运行，请等结束后再读取关注列表。","添加好友"); return; }
             if(Interlocked.CompareExchange(ref importingFollowing,1,0)!=0) return;
             string id=Guid.NewGuid().ToString("N");
             string folder=Path.Combine(BaseDir,"logs");
