@@ -1,142 +1,64 @@
-﻿using System;
-using System.Diagnostics;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Windows.Forms;
-using System.Windows.Forms.Integration;
 
 namespace DouyinSpark
 {
-    class SparkProgress : Control
+    class SparkProgress:Control
     {
-        public int Done = 0;
-        public int Total = 0;
-        public string Info = "";
-        public bool Finished = false;
-        private long finishStart = 0;
-        private System.Windows.Forms.Timer animTimer;
-
+        public int Done,Total;
+        public string Info="";
+        public bool Finished,ErrorState;
+        double displayed;
+        int finishStart;
+        string lastInfo="";
+        readonly Timer animation;
         public SparkProgress()
         {
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
-            DoubleBuffered = true;
-            animTimer = new System.Windows.Forms.Timer();
-            animTimer.Interval = 50;
-            animTimer.Tick += delegate { Invalidate(); };
-            animTimer.Start();
+            SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+            BackColor=AppPalette.Canvas;
+            animation=new Timer {Interval=30};
+            animation.Tick+=delegate
+            {
+                double target=Total>0?Math.Min(1d,Math.Max(0d,(double)Done/Total)):0;
+                bool moving=Math.Abs(target-displayed)>.001;
+                if(moving)displayed+=(target-displayed)*.20;
+                else displayed=target;
+                if(moving || lastInfo!=Info || Finished && unchecked(Environment.TickCount-finishStart)<450) {lastInfo=Info;Invalidate();}
+            };
+            animation.Start();
         }
-
-        public void MarkFinished()
-        {
-            Finished = true;
-            finishStart = Environment.TickCount;
-            Invalidate();
-        }
-
-        public void Reset()
-        {
-            Finished = false;
-            finishStart = 0;
-            if (!animTimer.Enabled) animTimer.Start();
-            Invalidate();
-        }
-
+        public void Reset(){Finished=false;ErrorState=false;displayed=0;Info="";Invalidate();}
+        public void MarkFinished(bool error=false){Finished=true;ErrorState=error;finishStart=Environment.TickCount;Invalidate();}
+        protected override void Dispose(bool disposing){if(disposing)animation.Dispose();base.Dispose(disposing);}
         protected override void OnPaint(PaintEventArgs e)
         {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            int w = ClientSize.Width, h = ClientSize.Height;
-            int barH = 24, barY = 8;
-            var slot = new Rectangle(0, barY, w, barH);
-            double pct = (Total <= 0) ? 0 : Math.Min(1.0, (double)Done / Total);
-            if (Finished)
+            var g=e.Graphics;g.Clear(AppPalette.Canvas);g.SmoothingMode=SmoothingMode.AntiAlias;
+            var slot=new RectangleF(0,5,Math.Max(1,Width-1),7);
+            using(var path=AppPalette.Round(slot,4))using(var brush=new SolidBrush(AppPalette.Border))g.FillPath(brush,path);
+            float width=(float)(slot.Width*displayed);
+            Color color=Finished?(ErrorState?AppPalette.Warning:AppPalette.SuccessBar):AppPalette.Accent;
+            if(width>1)using(var path=AppPalette.Round(new RectangleF(0,5,width,7),4))
+            using(var brush=new LinearGradientBrush(new RectangleF(0,5,Math.Max(2,width),7),color,Finished?color:AppPalette.AccentDeep,0f))g.FillPath(brush,path);
+            int x=0;
+            if(Finished)
             {
-                // 完成态：整条绿色铺满，不留粉边
-                using (var lg = new LinearGradientBrush(slot, Color.FromArgb(126, 220, 150), Color.FromArgb(90, 195, 130), LinearGradientMode.Horizontal))
-                    FillRounded(g, lg, slot, 12);
-                // 白色对勾居中偏左
-                using (var pen = new Pen(Color.FromArgb(25,85,48), 2))
+                float scale=(float)Math.Min(1d,Math.Max(.6,unchecked(Environment.TickCount-finishStart)/200d));
+                var state=g.Save();g.TranslateTransform(10,31);g.ScaleTransform(scale,scale);
+                using(var pen=new Pen(ErrorState?AppPalette.Warning:AppPalette.Success,2){StartCap=LineCap.Round,EndCap=LineCap.Round})
                 {
-                    pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
-                    pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
-                    g.DrawLines(pen, new[] {
-                        new PointF(w * 0.5f - 9, barY + barH * 0.5f),
-                        new PointF(w * 0.5f - 2, barY + barH * 0.72f),
-                        new PointF(w * 0.5f + 10, barY + barH * 0.27f)
-                    });
+                    if(ErrorState){g.DrawEllipse(pen,-7,-7,14,14);g.DrawLine(pen,0,-4,0,1);g.DrawLine(pen,0,4,0,4.3f);}
+                    else g.DrawLines(pen,new[]{new Point(-6,0),new Point(-1,5),new Point(8,-5)});
                 }
-                // 撒花粒子（3秒），播完停定时器
-                int el = (int)((Environment.TickCount - finishStart) / 1000.0);
-                if (el < 3)
-                {
-                    var rnd = new Random(2024);
-                    for (int i = 0; i < 26; i++)
-                    {
-                        float px = rnd.Next(10, w - 10);
-                        float py = barY + 20 + el * 60 + rnd.Next(0, 50);
-                        if (py > h - 8) continue;
-                        int rr = rnd.Next(200, 255), gg = rnd.Next(120, 190), bb2 = rnd.Next(180, 230);
-                        g.FillEllipse(new SolidBrush(Color.FromArgb(220, rr, gg, bb2)), px, py, 6, 6);
-                    }
-                }
-                else if (animTimer.Enabled) animTimer.Stop();
+                g.Restore(state);x=28;
             }
-            else
-            {
-                using (var bb = new SolidBrush(Color.FromArgb(255, 227, 238)))
-                    FillRounded(g, bb, slot, 12);
-                if (pct > 0 && Total > 0)
-                {
-                    int pw = (int)((w - 4) * pct);
-                    var fill = new Rectangle(2, barY + 2, pw, barH - 4);
-                    using (var lg = new LinearGradientBrush(fill, KittyTheme.KPink, Color.FromArgb(255, 168, 208), LinearGradientMode.Horizontal))
-                        FillRounded(g, lg, fill, 10);
-                    double fx = (fill.Width - 60) * (0.5 + 0.5 * Math.Sin(Environment.TickCount / 240.0));
-                    if (fx < 0) fx = 0;
-                    using (var hot = new SolidBrush(Color.FromArgb(150, 255, 255, 255)))
-                        g.FillRectangle(hot, (int)(2 + fx), barY + 2, 60, barH - 4);
-                }
-            }
-            string pctText = Finished ? "100%" : ((Total <= 0) ? "0%" : ((int)(pct * 100) + "%"));
-            string sub = Finished ? "✓ 全部完成" : ((Total <= 0) ? "点「开始续火花」启动" : (Done + " / " + Total));
-            using (var f1 = new Font("Microsoft YaHei UI", 14F, FontStyle.Bold))
-            using (var b1 = new SolidBrush(Finished ? Color.FromArgb(70, 170, 110) : Color.FromArgb(205, 60, 115)))
-            {
-                g.DrawString(pctText, f1, b1, new PointF(8, barY + barH + 4));
-                if (Total > 0 || Finished)
-                {
-                    using (var f2 = new Font("Microsoft YaHei UI", 9F))
-                    using (var b2 = new SolidBrush(Color.FromArgb(180, 130, 150)))
-                        g.DrawString(sub, f2, b2, new PointF(8 + g.MeasureString(pctText, f1).Width + 12, barY + barH + 9));
-                }
-            }
-            if (Info.Length > 0)
-            {
-                using (var f3 = new Font("Microsoft YaHei UI", 9.5F))
-                using (var b3 = new SolidBrush(Color.FromArgb(190, 130, 150)))
-                {
-                    var sz = g.MeasureString(Info, f3);
-                    g.DrawString(Info, f3, b3, new PointF(w - sz.Width - 10, barY + barH + 8));
-                }
-            }
-        }
-
-        static void FillRounded(Graphics g, Brush b, Rectangle r, int rad)
-        {
-            var path = new System.Drawing.Drawing2D.GraphicsPath();
-            int d = rad * 2;
-            path.AddArc(r.X, r.Y, d, d, 180, 90);
-            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-            path.CloseFigure();
-            g.FillPath(b, path);
+            string stateText=Finished?(ErrorState?"本轮结束 · 请查看异常记录":"本轮处理完成"):Total>0?"发送进度 "+Done+" / "+Total:"准备就绪";
+            using(var font=AppPalette.Font(9,true))using(var brush=new SolidBrush(AppPalette.Text))g.DrawString(stateText,font,brush,new RectangleF(x,22,310,24));
+            string detail=Info.Length>0?Info:Total==0?"先预览，再发送；结果将保存在本机。":((int)(displayed*100))+"%";
+            using(var font=AppPalette.Font(8.5f))using(var brush=new SolidBrush(AppPalette.Muted))
+            using(var format=new StringFormat {Alignment=StringAlignment.Far,Trimming=StringTrimming.EllipsisCharacter,FormatFlags=StringFormatFlags.NoWrap})
+                g.DrawString(detail,font,brush,new RectangleF(320,24,Math.Max(1,Width-322),22),format);
         }
     }
-
 }

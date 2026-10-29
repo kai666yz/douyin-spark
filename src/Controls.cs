@@ -11,7 +11,7 @@ using System.Windows.Forms.Integration;
 
 namespace DouyinSpark
 {
-    class CardForm : Form
+    class CardForm : ThemedForm
     {
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -53,44 +53,52 @@ namespace DouyinSpark
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (var brush = new SolidBrush(Color.White))
-                e.Graphics.FillRoundedRect(brush, 0, 0, Width - 1, Height - 1, 12);
+            using (var brush = new SolidBrush(AppPalette.Surface))
+                e.Graphics.FillRoundedRect(brush, 0, 0, Width - 1, Height - 1, 16);
             base.OnPaint(e);
         }
     }
 
     class RoundButton : Button
     {
-        public Color MainColor = Color.FromArgb(255, 111, 165);
-        public Color HoverColor = Color.FromArgb(255, 92, 138);
-        bool hover = false;
+        public Color MainColor=AppPalette.Accent, HoverColor=AppPalette.AccentDeep;
+        public bool Primary=true, Navigation=false, Selected=false;
+        public int CornerRadius=16;
+        public string IconName="";
+        bool hover,pressed;
         public RoundButton()
         {
-            FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0;
-            FlatAppearance.MouseOverBackColor = Color.Transparent;
-            ForeColor = Color.White; Cursor = Cursors.Hand;
-            TabStop = false;
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
-            MouseEnter += delegate { hover = true; Invalidate(); };
-            MouseLeave += delegate { hover = false; Invalidate(); };
+            FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;Cursor=Cursors.Hand;TabStop=true;
+            SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);
+            MouseEnter+=delegate{hover=true;Invalidate();};MouseLeave+=delegate{hover=false;pressed=false;Invalidate();};
+            MouseDown+=delegate{pressed=true;Invalidate();};MouseUp+=delegate{pressed=false;Invalidate();};
+            EnabledChanged+=delegate{Invalidate();};
         }
         protected override void OnPaint(PaintEventArgs e)
         {
-            var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-            Color c = hover ? HoverColor : MainColor;
-            Rectangle rc = new Rectangle(0, 0, Width - 1, Height - 1);
-            using (var path = new GraphicsPath())
+            var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
+            Color parentColor=Parent is OverviewCard || Parent is CardSurface ? AppPalette.Surface : Parent!=null?Parent.BackColor:AppPalette.Surface;
+            g.Clear(parentColor);
+            int shift=pressed?1:0;
+            var box=new RectangleF(1,1+shift,Width-3,Height-5);
+            Color fill=Primary?(Enabled?(hover?AppPalette.AccentDeep:AppPalette.Accent):AppPalette.Soft):Selected||hover?AppPalette.Soft:parentColor;
+            Color foreground=Primary&&Enabled?(AppPalette.Dark?AppPalette.Canvas:Color.White):Selected?AppPalette.AccentDeep:Enabled?AppPalette.Text:AppPalette.Muted;
+            if(Primary&&Enabled)
             {
-                int r = 6;
-                path.AddArc(rc.X, rc.Y, r * 2, r * 2, 180, 90);
-                path.AddArc(rc.Right - r * 2, rc.Y, r * 2, r * 2, 270, 90);
-                path.AddArc(rc.Right - r * 2, rc.Bottom - r * 2, r * 2, r * 2, 0, 90);
-                path.AddArc(rc.X, rc.Bottom - r * 2, r * 2, r * 2, 90, 90);
-                path.CloseFigure();
-                using (var brush = new SolidBrush(c)) g.FillPath(brush, path);
+                using(var path=AppPalette.Round(new RectangleF(box.X,box.Y+2,box.Width,box.Height),CornerRadius))
+                using(var brush=new SolidBrush(Color.FromArgb(20,80,40,57)))g.FillPath(brush,path);
             }
-            var sf = new StringFormat(); sf.Alignment = StringAlignment.Center; sf.LineAlignment = StringAlignment.Center;
-            g.DrawString(Text, Font, new SolidBrush(ForeColor), new RectangleF(0, 0, Width, Height), sf);
+            using(var path=AppPalette.Round(box,CornerRadius))
+            using(var brush=new SolidBrush(fill))g.FillPath(brush,path);
+            bool icon=IconName.Length>0;
+            if(icon)
+            {
+                int x=Navigation?18:Primary?(Width/2-52):12;
+                LineIcons.Draw(g,IconName,new Rectangle(x,(Height-20)/2+shift-1,20,20),foreground);
+            }
+            var textBox=Navigation?new Rectangle(48,shift,Width-54,Height-4):icon?new Rectangle(Primary?26:32,shift,Width-(Primary?40:38),Height-4):new Rectangle(0,shift,Width,Height-4);
+            TextRenderer.DrawText(g,Text,Font,textBox,foreground,TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|(Navigation?TextFormatFlags.Left:TextFormatFlags.HorizontalCenter));
+            if(Focused)using(var path=AppPalette.Round(new RectangleF(2,2,Width-5,Height-6),CornerRadius))using(var pen=new Pen(AppPalette.Accent,1))g.DrawPath(pen,path);
         }
     }
 

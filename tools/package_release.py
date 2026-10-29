@@ -21,6 +21,10 @@ def main():
         stage.mkdir()
         for name in ('抖音续火花.exe','icon.ico','LICENSE','README.md'):
             shutil.copy2(ROOT/name,stage/name)
+        if (ROOT/'docs').is_dir():
+            (stage/'docs').mkdir()
+            for name in ('ui-light.png','ui-dark.png'):
+                if (ROOT/'docs'/name).is_file():shutil.copy2(ROOT/'docs'/name,stage/'docs'/name)
         pool=json.loads((ROOT/'sentences_pool.json').read_text('utf-8-sig'))
         # Never publish local custom messages or a personal category selection.
         if 'categories' in pool:
@@ -43,7 +47,7 @@ def main():
                         target=licenses/name/item.name
                         target.parent.mkdir(parents=True,exist_ok=True)
                         shutil.copy2(source,target)
-        readme='''抖音续火花 v1.9.1 · Windows 64位便携版
+        readme='''抖音续火花 v1.10.0 · Windows 64位便携版
 
 完整解压后双击“抖音续火花.exe”。请保留 spark_backend 整个文件夹。
 已包含独立后端及 Python/Playwright，不用另装 Python、豆包或浏览器内核。

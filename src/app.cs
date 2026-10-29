@@ -24,7 +24,7 @@ namespace DouyinSpark
         static string scheduleTime = "";     // 每日定时 "HH:mm"
         static bool scheduleFired = false;   // 当天是否已触发
         static string scheduleLastDay = "";  // 上次触发的日期
-        const string AppVersion = "1.9.1";
+        const string AppVersion = "1.10.0";
 
         // HelloKitty 主题别名（Program 内直接使用）
         static readonly Color KPink = KittyTheme.KPink;
@@ -90,341 +90,7 @@ namespace DouyinSpark
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // 启动动画 splash（炫酷发光文字 + 双缓冲防闪烁）
-            if (!minimized)
-            {
-                var splash = new SplashForm();
-                splash.FormBorderStyle = FormBorderStyle.None;
-                splash.StartPosition = FormStartPosition.CenterScreen;
-                splash.Size = new Size(900, 600);
-                splash.BackColor = KPinkBg;
-                splash.TopMost = true;
-                int startTick = Environment.TickCount;
-                splash.Paint += delegate(object s, PaintEventArgs e)
-                {
-                    var g = e.Graphics;
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-                    int elapsed = Environment.TickCount - startTick;
-                    double t = elapsed / 1000.0;
-                    int cx = splash.ClientSize.Width / 2;
-                    int cy = splash.ClientSize.Height / 2;
-                    var sf = new StringFormat();
-                    sf.Alignment = StringAlignment.Center; sf.LineAlignment = StringAlignment.Center;
-
-                    // 背景柔光
-                    using (var glow = new SolidBrush(Color.FromArgb(90, 255, 200, 224)))
-                        g.FillEllipse(glow, cx - 260, cy - 210, 520, 420);
-
-                    // Kitty 猫脸：上下轻浮 + 蝴蝶结
-                    float kx = cx;
-                    float ky = cy - 62 + (float)(7 * Math.Sin(t * 1.6));
-                    PaintKittyFace(g, kx, ky, 88f);
-
-                    // 粉色粒子光点：8 个环绕
-                    int nP = 8;
-                    for (int i = 0; i < nP; i++)
-                    {
-                        double angle = t * 0.9 * (Math.PI * 2) + i * (Math.PI * 2 / nP);
-                        double px = kx + Math.Cos(angle) * 195 * (1 + 0.10 * Math.Sin(t * 2));
-                        double py = ky + Math.Sin(angle) * 95 * (1 + 0.10 * Math.Cos(t * 2));
-                        int pa = (int)(150 * (0.35 + 0.65 * (1 + Math.Sin(t * 3 + i * 1.3)) / 2));
-                        float pr = 2.5f + (float)(1.5 * (1 + Math.Sin(t * 2.2 + i * 1.7)) / 2);
-                        using (var pb = new SolidBrush((i % 2 == 0) ? Color.FromArgb(pa, KPink) : Color.FromArgb(pa, 255, 176, 205)))
-                            g.FillEllipse(pb, (float)(px - pr), (float)(py - pr), pr * 2, pr * 2);
-                    }
-
-                    // 主标题：弹性缩放 + 深粉→粉渐变，发光晕
-                    double scale;
-                    if (t < 0.35) { scale = 0.4 + (t / 0.35) * 0.8; }
-                    else if (t < 0.5) { double k = (t - 0.35) / 0.15; scale = 1.2 - k * 0.2; }
-                    else scale = 1.0;
-                    int alpha = (int)(255 * Math.Min(1, t / 0.4));
-                    using (var f = new Font("Microsoft YaHei UI", (float)(42 * scale), FontStyle.Bold))
-                    {
-                        for (int i = 6; i >= 1; i--)
-                        {
-                            int ga = (int)(alpha * 0.07);
-                            using (var glowb = new SolidBrush(Color.FromArgb(ga, KPink)))
-                                g.DrawString("抖音续火花", f, glowb, new RectangleF(0 - i, cy - 62 - i, splash.ClientSize.Width, 90), sf);
-                        }
-                        using (var lg = new LinearGradientBrush(
-                            new Rectangle(0, cy - 62, splash.ClientSize.Width, 90),
-                            Color.FromArgb(alpha, KPinkDeep),
-                            Color.FromArgb(alpha, KPink),
-                            LinearGradientMode.Horizontal))
-                            g.DrawString("抖音续火花", f, lg, new RectangleF(0, cy - 62, splash.ClientSize.Width, 90), sf);
-                    }
-
-                    // 副标题
-                    if (t > 0.5)
-                    {
-                        double sa = Math.Min(1, (t - 0.5) / 0.4);
-                        using (var f = new Font("Microsoft YaHei UI", 11F))
-                        using (var b = new SolidBrush(Color.FromArgb((int)(190 * sa), KPinkText)))
-                            g.DrawString("Spark every day  ✿ 每天一句废话文学", f, b, new RectangleF(0, cy + 42, splash.ClientSize.Width, 30), sf);
-                    }
-
-                    // 底部粉色流光进度条
-                    if (t > 0.3)
-                    {
-                        double prog = Math.Min(1, (t - 0.3) / 1.6);
-                        int bw = 300, bh = 5;
-                        int bx = cx - bw / 2, by = cy + 118;
-                        using (var back = new SolidBrush(Color.FromArgb(255, 228, 238)))
-                            g.FillRectangle(back, bx, by, bw, bh);
-                        if (prog > 0.01)
-                        {
-                            int w = (int)(bw * prog);
-                            using (var fore = new SolidBrush(KPink))
-                                g.FillRectangle(fore, bx, by, w, bh);
-                            double hi = (w - 46) * (0.5 + 0.5 * Math.Sin(t * 6));
-                            if (hi < 0) hi = 0;
-                            using (var hot = new SolidBrush(Color.FromArgb(230, 255, 255, 255)))
-                                g.FillRectangle(hot, bx + (float)hi, by, 46, bh);
-                        }
-                    }
-                };
-                var animTimer = new System.Windows.Forms.Timer();
-                animTimer.Interval = 30;
-                animTimer.Tick += delegate { splash.Invalidate(); };
-                animTimer.Start();
-                var closeTimer = new System.Windows.Forms.Timer();
-                closeTimer.Interval = 2200;
-                closeTimer.Tick += delegate { animTimer.Stop(); splash.Close(); closeTimer.Stop(); };
-                closeTimer.Start();
-                splash.ShowDialog();
-            }
-
-            var form = new CardForm();
-            mainForm = form;
-            form.Text = "抖音续火花";
-            form.Size = new Size(960, 760);
-            form.StartPosition = FormStartPosition.CenterScreen;
-            form.Font = new Font("Microsoft YaHei UI", 9F);
-            form.BackColor = Color.FromArgb(245, 246, 250);
-
-            // HelloKitty 少女粉主题
-            form.BackColor = KPinkBg;
-
-            // 右侧内容区先建（Dock.Fill 要先加）
-            var content = new Panel();
-            content.Dock = DockStyle.Fill;
-            content.BackColor = KPinkBg;
-            content.Padding = new Padding(30, 26, 30, 26);
-            form.Controls.Add(content);
-
-            // 左侧边栏
-            var sidebar = new Panel();
-            sidebar.Dock = DockStyle.Left;
-            sidebar.Width = 180;
-            sidebar.BackColor = KPinkSoft;
-            form.Controls.Add(sidebar);
-
-            var kittyBadge = new KittyBadge();
-            kittyBadge.Size = new Size(46, 42);
-            kittyBadge.Location = new Point(12, 14);
-            kittyBadge.BackColor = KPinkSoft;
-
-            var lblLogo = new Label();
-            lblLogo.Text = "抖音续火花";
-            lblLogo.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold);
-            lblLogo.ForeColor = KPinkDeep;
-            lblLogo.AutoSize = false;
-            lblLogo.Size = new Size(132, 36);
-            lblLogo.Location = new Point(58, 18);
-            lblLogo.BackColor = Color.Transparent;
-
-            var lblVer = new Label();
-            lblVer.Text = "v" + AppVersion + "  STABLE";
-            lblVer.Font = new Font("Microsoft YaHei UI", 7F);
-            lblVer.ForeColor = Color.FromArgb(205, 125, 155);
-            lblVer.AutoSize = false;
-            lblVer.Size = new Size(160, 14);
-            lblVer.Location = new Point(20, 60);
-            lblVer.BackColor = Color.Transparent;
-
-            // 边栏按钮容器
-            var sideBtns = new FlowLayoutPanel();
-            sideBtns.FlowDirection = FlowDirection.TopDown;
-            sideBtns.WrapContents = false;
-            sideBtns.Dock = DockStyle.None;
-            sideBtns.Location = new Point(14, 90);
-            sideBtns.Size = new Size(160, 560);
-            sideBtns.BackColor = Color.Transparent;
-
-            btnStart = new RoundButton();
-            btnStart.Text = "开始续火花";
-            btnStart.Size = new Size(150, 36);
-            btnStart.Margin = new Padding(0, 0, 0, 5);
-            btnStart.MainColor = KPink; btnStart.HoverColor = Color.FromArgb(255, 92, 138);
-            btnStart.ForeColor = Color.White;
-            btnStart.Click += delegate { DoStart(); };
-            sideBtns.Controls.Add(btnStart);
-
-            Action<string, EventHandler> addSideBtn = delegate(string text, EventHandler onClick)
-            {
-                var b = new RoundButton();
-                b.Text = text;
-                b.Size = new Size(150, 34);
-                b.Margin = new Padding(0, 0, 0, 5);
-                b.MainColor = Color.White;
-                b.HoverColor = Color.FromArgb(255, 228, 238);
-                b.ForeColor = KPinkDeep;
-                b.Click += onClick;
-                sideBtns.Controls.Add(b);
-            };
-
-            // 添加好友 = 一键导入抖音关注列表（可勾选添加），替代手动粘贴
-            addSideBtn("添加好友", delegate { ImportFollowing(); });
-            addSideBtn("好友状态", delegate { ShowFriendStatus(); });
-            addSideBtn("语录管理", delegate { ShowSentenceManager(); });
-            // 更多功能：收进下拉菜单
-            var moreMenu = new ContextMenuStrip();
-            moreMenu.Items.Add("预览句子", null, delegate { DoDry(); });
-            moreMenu.Items.Add("管理好友", null, delegate { AddFriend(); });
-            moreMenu.Items.Add("登录自检", null, delegate { DoLogin(); });
-            moreMenu.Items.Add("抖音消息", null, delegate { OpenMessages(); });
-            moreMenu.Items.Add("固定消息设置", null, delegate { ShowFixedMessage(); });
-            moreMenu.Items.Add("导出历史 CSV", null, delegate { ExportHistory(); });
-            moreMenu.Items.Add("清理旧历史", null, delegate { ClearHistory(); });
-            moreMenu.Items.Add("定时设置", null, delegate { ShowScheduleDialog(); });
-            moreMenu.Items.Add("开机自启", null, delegate { ToggleAutostart(); });
-            moreMenu.Items.Add("浏览器选择", null, delegate { ShowBrowserDialog(); });
-            moreMenu.Items.Add("换肤", null, delegate
-            {
-                var cd = new ColorDialog();
-                cd.Color = form.BackColor;
-                if (cd.ShowDialog() == DialogResult.OK)
-                {
-                    Color bg = cd.Color;
-                    bool dark = (bg.R + bg.G + bg.B) / 3 < 128;
-                    Color fg = dark ? Color.White : Color.FromArgb(30, 30, 40);
-                    Color sub = dark ? ControlPaint.Dark(bg, 0.15f) : ControlPaint.Light(bg, 0.15f);
-                    Color box = dark ? ControlPaint.Dark(bg, 0.3f) : ControlPaint.Light(bg, 0.1f);
-                    form.BackColor = bg; sidebar.BackColor = sub; content.BackColor = bg;
-                    txtLog.BackColor = box; txtLog.ForeColor = dark ? Color.FromArgb(200, 220, 210) : Color.FromArgb(40, 40, 50);
-                    dgv.BackgroundColor = box; dgv.DefaultCellStyle.BackColor = box; dgv.DefaultCellStyle.ForeColor = fg;
-                    dgv.RowsDefaultCellStyle.BackColor = box;
-                    dgv.AlternatingRowsDefaultCellStyle.BackColor = dark ? ControlPaint.Light(box, 0.15f) : ControlPaint.Dark(box, 0.08f);
-                    dgv.ColumnHeadersDefaultCellStyle.BackColor = sub; dgv.ColumnHeadersDefaultCellStyle.ForeColor = fg;
-                    lblLogo.ForeColor = fg; lblStatus.BackColor = sub; form.Invalidate();
-                }
-            });
-            moreMenu.Items.Add("启动游戏(Steam)", null, delegate
-            {
-                try { Process.Start("steam://rungameid/431960"); Log("已启动 Steam 游戏"); }
-                catch (Exception ex) { Log("启动失败: " + ex.Message); }
-            });
-            addSideBtn("更多功能", delegate (object s, EventArgs e)
-            {
-                var btn = s as Control;
-                if (btn != null) moreMenu.Show(btn, new Point(0, btn.Height));
-            });
-            addSideBtn("检查更新", delegate { DoCheckUpdate(); });
-
-            lblStatus = new Label();
-            lblStatus.Text = "● 就绪";
-            lblStatus.ForeColor = KPink;
-            lblStatus.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
-            lblStatus.Dock = DockStyle.Bottom;
-            lblStatus.Height = 40;
-            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
-            lblStatus.Padding = new Padding(18, 0, 0, 0);
-            lblStatus.BackColor = Color.FromArgb(255, 198, 222);
-
-            sidebar.Controls.Add(lblStatus);
-            sidebar.Controls.Add(sideBtns);
-            sidebar.Controls.Add(lblVer);
-            sidebar.Controls.Add(lblLogo);
-            sidebar.Controls.Add(kittyBadge);
-
-            // 内容区标题
-            var lblTitle = new Label();
-            lblTitle.Text = "服务与设置 ✿";
-            lblTitle.Font = new Font("Microsoft YaHei UI", 20F, FontStyle.Bold);
-            lblTitle.ForeColor = KPinkDeep;
-            lblTitle.AutoSize = false;
-            lblTitle.Size = new Size(600, 34);
-            lblTitle.Location = new Point(0, 0);
-            lblTitle.BackColor = Color.Transparent;
-
-            var lblSub = new Label();
-            lblSub.Text = "每日自动给好友发一句废话文学，维持火苗";
-            lblSub.Font = new Font("Microsoft YaHei UI", 9F);
-            lblSub.ForeColor = Color.FromArgb(175, 125, 145);
-            lblSub.AutoSize = false;
-            lblSub.Size = new Size(600, 18);
-            lblSub.Location = new Point(2, 36);
-            lblSub.BackColor = Color.Transparent;
-
-            progress = new SparkProgress();
-            progress.Location = new Point(0, 60);
-            progress.Size = new Size(720, 64);
-
-            // 日志区
-            var lblLogTitle = new Label();
-            lblLogTitle.Text = "运行记录";
-            lblLogTitle.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
-            lblLogTitle.ForeColor = KPinkDeep;
-            lblLogTitle.AutoSize = false;
-            lblLogTitle.Size = new Size(200, 22);
-            lblLogTitle.Location = new Point(0, 132);
-            lblLogTitle.BackColor = Color.Transparent;
-
-            txtLog = new RichTextBox();
-            txtLog.Location = new Point(0, 160);
-            txtLog.Size = new Size(720, 240);
-            txtLog.Font = new Font("Consolas", 9.5F);
-            txtLog.BackColor = Color.White;
-            txtLog.ForeColor = KPinkText;
-            txtLog.BorderStyle = BorderStyle.FixedSingle;
-            txtLog.ReadOnly = true;
-            txtLog.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-
-            // 记录表格
-            var lblRecTitle = new Label();
-            lblRecTitle.Text = "历史记录";
-            lblRecTitle.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
-            lblRecTitle.ForeColor = KPinkDeep;
-            lblRecTitle.AutoSize = false;
-            lblRecTitle.Size = new Size(200, 22);
-            lblRecTitle.Location = new Point(0, 412);
-            lblRecTitle.BackColor = Color.Transparent;
-            lblRecTitle.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-
-            dgv = new DataGridView();
-            dgv.Location = new Point(0, 440);
-            dgv.Size = new Size(720, 170);
-            dgv.ReadOnly = true; dgv.AllowUserToAddRows = false;
-            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgv.BackgroundColor = KPinkBox;
-            dgv.BorderStyle = BorderStyle.None;
-            dgv.RowHeadersVisible = false;
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.ColumnHeadersHeight = 28;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(255, 210, 228);
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = KPinkDeep;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Microsoft YaHei UI", 8F);
-            dgv.DefaultCellStyle.BackColor = KPinkBox;
-            dgv.DefaultCellStyle.ForeColor = KPinkText;
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 170, 205);
-            dgv.DefaultCellStyle.SelectionForeColor = Color.White;
-            dgv.RowsDefaultCellStyle.BackColor = KPinkBox;
-            dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(255, 240, 246);
-            dgv.RowTemplate.Height = 24;
-            dgv.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-
-            content.Controls.Add(lblTitle);
-            content.Controls.Add(lblSub);
-            content.Controls.Add(progress);
-            content.Controls.Add(lblLogTitle);
-            content.Controls.Add(txtLog);
-            content.Controls.Add(lblRecTitle);
-            content.Controls.Add(dgv);
-
-            form.Controls.Add(content);
-            form.Controls.Add(sidebar);
+            var form=BuildMainWindow();
 
             Log("就绪");
             // 清空上次的运行日志，防止无限增长
@@ -575,7 +241,7 @@ namespace DouyinSpark
 
         static void ShowBrowserDialog()
         {
-            var dlg = new Form();
+            var dlg = new ThemedForm();
             dlg.Text = "选择浏览器"; dlg.Size = new Size(320, 250);
             dlg.StartPosition = FormStartPosition.CenterParent; dlg.BackColor = Color.White;
             dlg.FormBorderStyle = FormBorderStyle.FixedDialog; dlg.MaximizeBox = false; dlg.MinimizeBox = false;
@@ -621,12 +287,13 @@ namespace DouyinSpark
         {
             if (string.IsNullOrEmpty(scheduleTime)) lblStatus.Text = "● 就绪";
             else lblStatus.Text = "● 定时 " + scheduleTime + " 每日自动";
-            lblStatus.ForeColor = KPink;
+            lblStatus.ForeColor = AppPalette.Muted;
+            RefreshDashboard();
         }
 
         static void ShowScheduleDialog()
         {
-            var dlg = new Form();
+            var dlg = new ThemedForm();
             dlg.Text = "每日定时"; dlg.Size = new Size(330, 200);
             dlg.StartPosition = FormStartPosition.CenterParent; dlg.BackColor = Color.White;
             dlg.FormBorderStyle = FormBorderStyle.FixedDialog; dlg.MaximizeBox = false; dlg.MinimizeBox = false;
@@ -683,6 +350,7 @@ namespace DouyinSpark
             if (txtLog == null || txtLog.IsDisposed) return;
             try
             {
+                if(Convert.ToString(txtLog.Tag)=="placeholder") {txtLog.Clear();txtLog.Tag=null;}
                 txtLog.AppendText(msg + "\n");
                 txtLog.SelectionStart = txtLog.TextLength; txtLog.ScrollToCaret();
                 if (txtLog.Lines.Length > 600)
@@ -756,6 +424,8 @@ namespace DouyinSpark
                 var rows=SparkStorage.ReadCsv(Path.Combine(BaseDir,"logs","spark_log.csv"));
                 foreach(var row in rows.Skip(Math.Max(0,rows.Count-500)).Reverse()) if(row.Length==6) table.Rows.Add(row.Cast<object>().ToArray());
                 dgv.DataSource=table;
+                FormatHistory();
+                RefreshDashboard();
             }
             catch(Exception ex) {Log("加载历史失败："+ex.Message);}
         }
@@ -833,7 +503,7 @@ namespace DouyinSpark
                 p.Exited += delegate
                 {
                     Log("完成，退出码 " + p.ExitCode);
-                    try { progress.Invoke(new Action(delegate { progress.MarkFinished(); progress.Info = "\u2713 本轮发送完成"; })); } catch { }
+                    try { progress.Invoke(new Action(delegate { progress.MarkFinished(p.ExitCode != 0); progress.Info = p.ExitCode == 0 ? "本轮处理结束" : "任务异常，请查看运行动态"; })); } catch { }
                     try { btnStart.Invoke(new Action(delegate { btnStart.Enabled = true; })); } catch { }
                     // LoadLogs 操作 dgv 控件，必须在 UI 线程执行
                     try
@@ -889,7 +559,7 @@ namespace DouyinSpark
                 if(data.TryGetValue("active_categories",out value)) foreach(var item in (System.Collections.IEnumerable)value) active.Add(Convert.ToString(item));
                 if(active.Count==0 && cats.ContainsKey("语录池")) active.Add("语录池");
                 if(!cats.ContainsKey("自定义")) cats["自定义"]=new string[0];
-                var form=new Form {Text="语录管理",Size=new Size(560,650),StartPosition=FormStartPosition.CenterParent,AutoScroll=true};
+                var form=new ThemedForm {Text="语录管理",Size=new Size(560,650),StartPosition=FormStartPosition.CenterParent,AutoScroll=true};
                 form.Controls.Add(new Label {Text="勾选启用分类；自定义语录每行一句。固定消息请在更多功能中设置。",Location=new Point(16,16),AutoSize=true});
                 int y=48;
                 var checks=new System.Collections.Generic.List<CheckBox>();

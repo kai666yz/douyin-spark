@@ -13,13 +13,13 @@ namespace DouyinSpark
 {
     static class KittyTheme
     {
-        public static readonly Color KPink = Color.FromArgb(255, 111, 165);      // 主粉
-        public static readonly Color KPinkDeep = Color.FromArgb(230, 70, 120);   // 深粉
-        public static readonly Color KPinkSoft = Color.FromArgb(255, 214, 232);  // 浅粉
+        public static readonly Color KPink = Color.FromArgb(164, 94, 118);      // 主粉
+        public static readonly Color KPinkDeep = Color.FromArgb(144, 78, 101);   // 深粉
+        public static readonly Color KPinkSoft = Color.FromArgb(249, 244, 244);  // 浅粉
         public static readonly Color KPinkBg = Color.FromArgb(255, 247, 250);    // 淡粉背景
-        public static readonly Color KPinkBox = Color.FromArgb(255, 244, 248);   // 卡片底
-        public static readonly Color KPinkLine = Color.FromArgb(235, 120, 160);  // 描边粉
-        public static readonly Color KPinkText = Color.FromArgb(120, 80, 95);    // 粉灰文字
+        public static readonly Color KPinkBox = Color.FromArgb(255, 255, 255);   // 卡片底
+        public static readonly Color KPinkLine = Color.FromArgb(183, 126, 145);  // 描边粉
+        public static readonly Color KPinkText = Color.FromArgb(58, 46, 51);    // 粉灰文字
 
         // 自绘 HelloKitty 风格猫脸（白猫脸 + 蝴蝶结 + 胡须），cx/cy 中心，s 缩放
         public static void PaintKittyFace(Graphics g, float cx, float cy, float s)
@@ -49,7 +49,7 @@ namespace DouyinSpark
                 g.DrawLine(whisker, cx + 0.30f * s, cy + 0.07f * s, cx + 0.60f * s, cy + 0.03f * s);
                 g.DrawLine(whisker, cx + 0.30f * s, cy + 0.16f * s, cx + 0.58f * s, cy + 0.16f * s);
             }
-            using (var bow = new SolidBrush(Color.FromArgb(255, 92, 122)))
+            using (var bow = new SolidBrush(Color.FromArgb(185, 109, 134)))
             {
                 g.FillEllipse(bow, cx - 0.74f * s, cy - 0.44f * s, 0.24f * s, 0.17f * s);
                 g.FillEllipse(bow, cx - 0.50f * s, cy - 0.50f * s, 0.24f * s, 0.17f * s);

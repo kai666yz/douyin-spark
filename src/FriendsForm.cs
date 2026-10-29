@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,7 +24,7 @@ namespace DouyinSpark
                     var cells = ParseCsvLine(line);
                     if (cells.Length >= 5 && cells[0].StartsWith(DateTime.Today.ToString("yyyy-MM-dd"))) sent[cells[2].TrimEnd('/')] = cells[4];
                 }
-                var form = new Form { Text="好友今日状态", Size=new Size(760,460), StartPosition=FormStartPosition.CenterParent };
+                var form = new ThemedForm { Text="好友今日状态", Size=new Size(760,460), StartPosition=FormStartPosition.CenterParent };
                 var grid = new DataGridView { Dock=DockStyle.Fill, ReadOnly=true, AllowUserToAddRows=false, AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill };
                 grid.Columns.Add("name","好友"); grid.Columns.Add("state","今日状态"); grid.Columns.Add("url","主页");
                 foreach (var f in SparkStorage.ReadFriends(FriendsPath))
@@ -61,7 +61,7 @@ namespace DouyinSpark
         {
             try
             {
-                var form = new Form { Text="管理好友", Size=new Size(620,540), StartPosition=FormStartPosition.CenterParent };
+                var form = new ThemedForm { Text="管理好友", Size=new Size(620,540), StartPosition=FormStartPosition.CenterParent };
                 var list = new ListBox { Location=new Point(16,16), Size=new Size(570,180) };
                 foreach (var friend in SparkStorage.ReadFriends(FriendsPath)) list.Items.Add(friend);
                 var delete = new Button { Text="删除选中", Location=new Point(16,205), Size=new Size(110,30) };
@@ -122,7 +122,7 @@ namespace DouyinSpark
 
         static void ShowFollowingPick(List<string[]> items, HashSet<string> exist)
         {
-            var form=new Form {Text="勾选添加好友",Size=new Size(580,500),StartPosition=FormStartPosition.CenterParent};
+            var form=new ThemedForm {Text="勾选添加好友",Size=new Size(580,500),StartPosition=FormStartPosition.CenterParent};
             var list=new CheckedListBox {Location=new Point(16,16),Size=new Size(530,370),CheckOnClick=true};
             foreach(var item in items) list.Items.Add(item[0]);
             var save=new Button {Text="导入选中",Location=new Point(400,405),Size=new Size(135,35)};

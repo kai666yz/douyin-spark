@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -29,7 +29,7 @@ namespace DouyinSpark
         }
         static void ShowFixedMessage()
         {
-            var form=new Form {Text="固定消息（手动与定时发送共用）",Size=new Size(510,280),StartPosition=FormStartPosition.CenterParent};
+            var form=new ThemedForm {Text="固定消息（手动与定时发送共用）",Size=new Size(510,280),StartPosition=FormStartPosition.CenterParent};
             var label=new Label {Text="留空使用语录池；固定消息可重复使用，但仍保留当天好友去重。",AutoSize=true,Location=new Point(15,15)};
             var box=new TextBox {Text=fixedMessage,Multiline=true,Location=new Point(15,50),Size=new Size(460,120)};
             var save=new Button {Text="保存",Location=new Point(365,185),Size=new Size(110,32)};

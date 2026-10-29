@@ -1,6 +1,14 @@
 # 抖音续火花 · douyin-spark
 
-Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发送自己配置的问候消息。当前版本 **v1.9.1**。
+Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发送自己配置的问候消息。当前版本 **v1.10.0**。
+
+## 界面预览
+
+奶白与低饱和粉为默认外观，也可在左下角切换深色模式。截图中的18/23及好友均为测试数据。
+
+![浅色界面（测试数据）](docs/ui-light.png)
+
+![深色界面（测试数据）](docs/ui-dark.png)
 
 ## 便携版使用
 
@@ -19,6 +27,8 @@ Windows 桌面助手，C# WinForms 界面配合 Playwright，管理好友并发�
 | 功能 | 入口与行为 |
 |---|---|
 | 添加好友 | “添加好友”导入关注列表；“更多功能 → 管理好友”手动添加、粘贴个人主页短链、删除 |
+| 今日概览 | 顶部查看已处理、成功、失败、待发、待确认与下次定时；按每位好友最后一次结果统计 |
+| 外观 | 左下角浅色/深色开关，自动保存；窗口变小时优先保留主要操作与历史 |
 | 好友状态 | 查看今天的状态；缺失主页显示“待补”，不会猜测链接 |
 | 语录管理 | 勾选分类、编辑自定义语录；支持旧句子库格式与节日优先 |
 | 固定消息 | “更多功能 → 固定消息设置”；留空恢复语录池，保存后对手动和定时任务生效 |
@@ -82,7 +92,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\package.ps1
 ```
 
-输出在 `dist/douyin-spark-v1.9.1-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。
+输出在 `dist/douyin-spark-v1.10.0-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。
 
 ## 源码结构
 
@@ -92,7 +102,11 @@ src/FriendsForm.cs      好友管理与关注导入
 src/Storage.cs          JSON、CSV与文本日志
 src/BackendLauncher.cs  后端选择与进程启动
 src/DesktopFeatures.cs 托盘、固定消息、历史和更新检查
-src/Theme.cs            主题绘制
+src/Theme.cs            Kitty绘制
+src/Appearance.cs       明暗配色、圆角与矢量图标
+src/MainView.cs         仪表盘布局与数据刷新
+src/DashboardCards.cs  概览和空状态卡片
+src/TodaySummary.cs    今日去重统计
 src/SparkProgress.cs    进度与完成动画
 src/Controls.cs         其他自绘控件
 douyin_spark.py         消息流程与命令行参数
