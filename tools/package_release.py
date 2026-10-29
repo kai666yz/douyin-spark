@@ -52,7 +52,7 @@ def main():
                         target=licenses/name/item.name
                         target.parent.mkdir(parents=True,exist_ok=True)
                         shutil.copy2(source,target)
-        readme='''抖音续火花 v2.1.0 · Windows 64位便携版
+        readme='''抖音续火花 v2.1.1 · Windows 64位便携版
 
 完整解压后双击“抖音续火花.exe”。请保留 spark_backend 整个文件夹。
 已包含独立后端及 Python/Playwright，不用另装 Python、豆包或浏览器内核。

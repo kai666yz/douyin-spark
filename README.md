@@ -1,6 +1,6 @@
 # 抖音续火花 · douyin-spark
 
-Windows 桌面助手，C# WinForms 界面配合内嵌 WebView2 与独立 Playwright 后端，管理好友和群聊。当前版本 **v2.1.0**。
+Windows 桌面助手，C# WinForms 界面配合内嵌 WebView2 与独立 Playwright 后端，管理好友和群聊。当前版本 **v2.1.1**。
 
 ## 界面预览
 
@@ -27,6 +27,8 @@ Windows 桌面助手，C# WinForms 界面配合内嵌 WebView2 与独立 Playwri
 
 - 从内嵌消息页面读取已加载会话的名称、类型和稳定标识，不保存聊天正文，不抓取或导出登录 Cookie。
 - 在同一软件目录中保留 `conversation_profile`，登录有效时无需重复扫码。上次读取的会话缓存可直接勾选，不启动网页；刷新新会话时才展开网页。
+- “读取当前会话”会尝试打开消息并等待读取。已加载的消息面板即使因切换焦点而隐藏，仍可识别其会话元数据；单击复选框即可选择联系人。
+- 读取失败会提示原因及下一步，计数诊断保存在 `logs/conversation_read.log`，其中不包含联系人名称、标识、聊天正文或 Cookie。
 - 只展示可验证标识或个人主页的条目，不靠昵称猜测身份。相同群名、不同会话标识分别保留。
 - 当前读取结果不代表所有历史会话。页面未加载、没有可识别标识、接口/DOM变化时，可能只能读取部分会话；可在消息页继续加载，或使用“关注导入”和手动添加。
 - 类型不明的条目需用户确认；私信无主页时仅管理；群聊仅管理，不进入现有发送后端。右键联系人可移出本软件名单，不会解除抖音好友或退出群聊。
@@ -113,7 +115,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\package.ps1
 ```
 
-输出在 `dist/douyin-spark-v2.1.0-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。构建时从 NuGet 下载固定版本 WebView2 SDK，并校验 SHA-256；不把本机 Runtime 或登录文件打包。
+输出在 `dist/douyin-spark-v2.1.1-windows-x64.zip`。使用 PyInstaller 文件夹模式，附带必要依赖与许可证；不直接复制本机 `.venv`。构建时从 NuGet 下载固定版本 WebView2 SDK，并校验 SHA-256；不把本机 Runtime 或登录文件打包。
 
 ## 源码结构
 

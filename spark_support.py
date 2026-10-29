@@ -10,7 +10,7 @@ import shutil
 import sys
 import tempfile
 
-VERSION = '2.1.0'
+VERSION = '2.1.1'
 FIELDS = ['time', 'friend', 'url', 'message', 'status', 'note']
 
 def acquire_task_lock(path):

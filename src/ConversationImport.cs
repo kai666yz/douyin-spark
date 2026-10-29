@@ -49,16 +49,17 @@ namespace DouyinSpark
             read=new RoundButton {Text="读取当前会话",Size=new Size(140,36),Margin=new Padding(0,0,8,0)};
             var scroll=new RoundButton {Text="加载更多",Primary=false,Size=new Size(104,36),Margin=new Padding(0,0,8,0)};
             var hide=new RoundButton {Text="收起网页",Primary=false,Size=new Size(104,36)};
-            login.Click+=async delegate{await OpenWeb();};read.Click+=async delegate{if(web==null)await OpenWeb();else await ReadCurrent();};
-            scroll.Click+=async delegate{if(web!=null&&web.CoreWebView2!=null){await web.ExecuteScriptAsync("(() => {const a=[...document.querySelectorAll('[data-e2e*=conversation], [data-e2e*=chat-list], [data-e2e*=session-list]')];const el=a.find(x=>x.scrollHeight>x.clientHeight+40);if(el)el.scrollBy(0,500);return !!el;})()");await Task.Delay(700);await ReadCurrent();}};
+            login.Click+=async delegate{await OpenWeb();};read.Click+=async delegate{await ReadCurrent();};
+            scroll.Click+=async delegate{await LoadMore();};
             hide.Click+=delegate{split.Panel1Collapsed=!split.Panel1Collapsed;};tools.Controls.AddRange(new Control[]{login,read,scroll,hide});layout.Controls.Add(tools,0,1);
             split=new SplitContainer {Dock=DockStyle.Fill,Orientation=Orientation.Vertical,SplitterWidth=8,Panel1Collapsed=true};
-            grid=new DataGridView {Dock=DockStyle.Fill,AutoGenerateColumns=false,AllowUserToAddRows=false,AllowUserToDeleteRows=false,RowHeadersVisible=false,SelectionMode=DataGridViewSelectionMode.FullRowSelect,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill};
+            grid=new DataGridView {Dock=DockStyle.Fill,AutoGenerateColumns=false,AllowUserToAddRows=false,AllowUserToDeleteRows=false,RowHeadersVisible=false,SelectionMode=DataGridViewSelectionMode.FullRowSelect,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,EditMode=DataGridViewEditMode.EditOnEnter};
             grid.Columns.Add(new DataGridViewCheckBoxColumn {Name="pick",HeaderText="选择",AutoSizeMode=DataGridViewAutoSizeColumnMode.None,Width=52});
             grid.Columns.Add(new DataGridViewComboBoxColumn {Name="kind",HeaderText="类型",FillWeight=24,DataSource=new[]{"私信","群聊","待确认"}});
             grid.Columns.Add(new DataGridViewTextBoxColumn {Name="name",HeaderText="名称",ReadOnly=true,FillWeight=40});
             grid.Columns.Add(new DataGridViewTextBoxColumn {Name="url",HeaderText="个人主页（可补填）",FillWeight=65});
             grid.CurrentCellDirtyStateChanged+=delegate{if(grid.IsCurrentCellDirty)grid.CommitEdit(DataGridViewDataErrorContexts.Commit);};
+            grid.CellValueChanged+=delegate(object s,DataGridViewCellEventArgs e){if(e.RowIndex>=0&&grid.Columns[e.ColumnIndex].Name=="pick")UpdateSelectionCount();};
             grid.DataError+=delegate(object s,DataGridViewDataErrorEventArgs e){e.ThrowException=false;};
             split.Panel2.Controls.Add(grid);layout.Controls.Add(split,0,2);
             var bottom=new Panel {Dock=DockStyle.Fill};status=new Label {Text="没有缓存时，请点“登录 / 刷新”，在软件内打开消息列表，再读取会话。",Location=new Point(0,12),Size=new Size(650,45),Font=AppPalette.Font(9),Tag="muted"};
@@ -127,19 +128,54 @@ namespace DouyinSpark
         }
         async Task ReadCurrent()
         {
-            if(busy||web==null||web.CoreWebView2==null)return;busy=true;read.Enabled=false;
+            if(busy||initializing)return;
+            if(web==null)await OpenWeb();
+            if(web==null||web.CoreWebView2==null)return;busy=true;read.Enabled=false;
             try{
-                if(web.Source==null||!Trusted(web.Source.AbsoluteUri))throw new InvalidDataException("请先在软件内打开抖音消息页面。");
                 string script=File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","read_conversations.js"),Encoding.UTF8);
-                string json=await web.ExecuteScriptAsync(script);
-                var items=SparkStorage.Json().Deserialize<List<ConversationRecord>>(json)??new List<ConversationRecord>();
-                foreach(var item in items)try{Merge(item);}catch(InvalidDataException){}
+                string openScript=File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","open_messages.js"),Encoding.UTF8);
+                string diagnostic="";int found=0;bool requested=false;
+                status.Text="正在打开消息列表并读取联系人，请稍候…";
+                for(int attempt=0;attempt<16;attempt++){
+                    if(IsDisposed||web==null||web.CoreWebView2==null)return;
+                    if(web.Source==null||!Trusted(web.Source.AbsoluteUri)){await Task.Delay(1000);continue;}
+                    // Read mounted IM data first. A toolbar click can hide the popup.
+                    string json=await web.ExecuteScriptAsync(script);
+                    var items=SparkStorage.Json().Deserialize<List<ConversationRecord>>(json)??new List<ConversationRecord>();
+                    foreach(var item in items)try{Merge(item);found++;}catch(InvalidDataException){}
+                    diagnostic=await web.ExecuteScriptAsync("JSON.stringify(window.__sparkConversationReadReport || {})");
+                    if(found>0)break;
+                    if(!requested){string result=await web.ExecuteScriptAsync(openScript);requested=result.Contains("requested")||result.Contains("open");}
+                    await Task.Delay(1000);
+                }
+                SparkStorage.AppendLog(Path.Combine(root,"logs","conversation_read.log"),DateTime.Now.ToString("s")+" | this_read="+found+" | "+diagnostic+Environment.NewLine);
                 RebuildGrid();
-                if(candidates.Count==0){status.Text="未识别到可验证的会话。请先登录并打开消息列表；不按昵称猜测好友或群聊。";return;}
+                if(found==0){
+                    status.Text=candidates.Count>0?"本次未读取到新数据，右侧保留上次列表。请确认网页已登录，再重试。":"尚未读取到联系人。请在左侧完成登录，再点“读取当前会话”。";
+                    MessageBox.Show(this,"本次未取得可选择的联系人。\n请确认左侧已经登录，且可以看到消息列表，再重试读取。\n原名单和缓存均已保留；诊断记录位于 logs/conversation_read.log。","会话尚未读取",MessageBoxButtons.OK,MessageBoxIcon.Information);return;
+                }
                 SparkStorage.WriteJson(Path.Combine(root,"conversation_candidates.json"),candidates.Values.ToList());
-                status.Text="已读取 "+candidates.Count+" 个已加载会话，不代表全部。待确认类型需手动选择；无主页的私信仅管理、不发送。";
+                status.Text="已读取 "+candidates.Count+" 个会话；单击右侧“选择”复选框，再点“导入选中”。加载更多可继续读取。";
             }catch(Exception ex){status.Text="读取未完成，原名单已保留。";MessageBox.Show(this,ex.Message,"读取会话");}
             finally{busy=false;read.Enabled=true;}
+        }
+        async Task LoadMore()
+        {
+            if(busy||initializing)return;
+            if(web==null){await ReadCurrent();return;}
+            if(web.CoreWebView2==null)return;
+            try{
+                string open=File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","open_messages.js"),Encoding.UTF8);
+                await web.ExecuteScriptAsync(open);await Task.Delay(500);
+                string result=await web.ExecuteScriptAsync("(() => {const root=document.querySelector('[data-e2e=im-dialog]');if(!root)return false;const rows=[...root.querySelectorAll('[data-e2e=conversation-item]')];const nodes=[...root.querySelectorAll('[class*=ConversationList], [class*=conversationList], [class*=scroll], [class*=Scroll]')];for(const row of rows){let p=row.parentElement;for(let i=0;p&&i<6;i++,p=p.parentElement)nodes.push(p);}const el=nodes.find(x=>x.clientHeight>60&&x.scrollHeight>x.clientHeight+20&&/auto|scroll/.test(getComputedStyle(x).overflowY));if(!el)return false;el.scrollBy(0,Math.max(400,el.clientHeight*.8));return true;})()");
+                if(result=="false")status.Text="未找到可滚动的消息列表；可在左侧手动向下滚动后再次读取。";
+                await Task.Delay(900);await ReadCurrent();
+            }catch(Exception ex){status.Text="加载更多未完成："+ex.Message;}
+        }
+        void UpdateSelectionCount()
+        {
+            if(status==null)return;int count=grid.Rows.Cast<DataGridViewRow>().Count(row=>Convert.ToBoolean(row.Cells["pick"].Value??false));
+            status.Text="已选择 "+count+" 个会话；确认后点右下角“导入选中”。";
         }
         void RebuildGrid()
         {
