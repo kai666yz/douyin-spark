@@ -34,7 +34,9 @@ async def visible_editor(page, timeout=20):
         for frame in page.frames:
             try:
                 nodes=frame.locator('[contenteditable="true"]:visible, textarea[data-e2e*="chat"]:visible')
-                if await nodes.count()==1:
+                count=await nodes.count()
+                if count>1:return None
+                if count==1:
                     found.append(nodes.first)
             except Exception:
                 continue

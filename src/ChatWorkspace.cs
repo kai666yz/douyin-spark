@@ -78,15 +78,20 @@ namespace DouyinSpark
             roster.MouseDown+=delegate(object sender,MouseEventArgs e){if(e.Button==MouseButtons.Right){int i=roster.IndexFromPoint(e.Location);if(i>=0)roster.SelectedIndex=i;}};
             var listHost=new Panel {Dock=DockStyle.Fill};rosterEmpty=ViewLabel("还没有联系人\r\n点击右上角“导入”选择私信或群聊",10,false,true);rosterEmpty.Dock=DockStyle.Fill;rosterEmpty.TextAlign=ContentAlignment.MiddleCenter;listHost.Controls.Add(roster);listHost.Controls.Add(rosterEmpty);listLayout.Controls.Add(listHost,0,3);listCard.Controls.Add(listLayout);middle.Controls.Add(listCard,0,4);
             var right=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(6,22,18,20),Margin=Padding.Empty,Tag="canvas"};
-            right.RowStyles.Add(new RowStyle(SizeType.Absolute,138));right.RowStyles.Add(new RowStyle(SizeType.Absolute,226));right.RowStyles.Add(new RowStyle(SizeType.Percent,100));right.RowStyles.Add(new RowStyle(SizeType.Absolute,108));contactColumns.Controls.Add(right,1,0);
+            right.RowStyles.Add(new RowStyle(SizeType.Absolute,138));right.RowStyles.Add(new RowStyle(SizeType.Absolute,292));right.RowStyles.Add(new RowStyle(SizeType.Percent,100));right.RowStyles.Add(new RowStyle(SizeType.Absolute,108));contactColumns.Controls.Add(right,1,0);
             var identity=new CardSurface {Dock=DockStyle.Fill,Margin=new Padding(0,0,0,10),Padding=new Padding(16)};
             detailName=ViewLabel("选择一个联系人",14,true);detailName.SetBounds(18,20,280,30);detailKind=ViewLabel("查看详情和消息预览",9,false,true);detailKind.SetBounds(19,59,275,24);detailState=ViewLabel("",9,false,true);detailState.SetBounds(19,91,275,24);identity.Controls.AddRange(new Control[]{detailName,detailKind,detailState});right.Controls.Add(identity,0,0);
             var preview=new CardSurface {Dock=DockStyle.Fill,Margin=new Padding(0,0,0,10),Padding=new Padding(16)};
-            var previewTitle=ViewLabel("消息预览",11,true);previewTitle.SetBounds(18,16,240,28);
-            detailPreview=new TextBox {Multiline=true,ReadOnly=true,BorderStyle=BorderStyle.None,Location=new Point(20,54),Size=new Size(270,76),Font=AppPalette.Font(11),ScrollBars=ScrollBars.None};
-            detailHint=ViewLabel("预览不会触发发送",8,false,true);detailHint.SetBounds(18,139,270,32);
-            completeProfile=new RoundButton {Text="统一消息设置",Primary=false,Location=new Point(18,177),Size=new Size(174,32),Font=AppPalette.Font(9)};completeProfile.Click+=delegate{var item=roster.SelectedItem as RosterItem;if(item!=null&&item.Kind=="group")OpenGroupTask(false,item.ConversationId);else if(item!=null&&!item.Sendable&&item.Kind=="private")CompleteRosterProfile(item);else{ShowFixedMessage();RefreshDashboard();ShowRosterDetail();}};
-            preview.Controls.AddRange(new Control[]{previewTitle,detailPreview,detailHint,completeProfile});right.Controls.Add(preview,0,1);
+            privateMessageTitle=ViewLabel("私信固定消息",11,true);privateMessageTitle.SetBounds(18,16,270,28);
+            privateMessageDraft=fixedMessage;privateMessageDraftLoaded=true;privateMessageSaveError=false;
+            detailPreview=new TextBox {Text=privateMessageDraft,Multiline=true,AcceptsReturn=true,BorderStyle=BorderStyle.FixedSingle,Location=new Point(18,54),Size=new Size(274,104),Font=AppPalette.Font(10),ScrollBars=ScrollBars.Vertical,AccessibleName="私信固定消息编辑框",AccessibleDescription="输入消息后点击保存消息，手动和定时私信共用已保存内容"};
+            detailPreview.TextChanged+=delegate{if(!syncingPrivateMessage&&!detailPreview.ReadOnly){privateMessageDraft=detailPreview.Text;privateMessageSaveError=false;RefreshPrivateMessageStatus();}};
+            detailPreview.KeyDown+=delegate(object sender,KeyEventArgs e){if(e.Control&&e.KeyCode==Keys.S&&!detailPreview.ReadOnly){e.SuppressKeyPress=true;SaveInlinePrivateMessage();}};
+            detailHint=ViewLabel("保存后，手动和定时私信均固定发送此消息。",8,false,true);detailHint.SetBounds(18,167,274,31);
+            privateMessageStatus=ViewLabel("",8,true);privateMessageStatus.SetBounds(18,203,274,24);privateMessageStatus.AccessibleName="消息保存状态";
+            savePrivateMessage=new RoundButton {Text="保存消息",Primary=true,Location=new Point(18,236),Size=new Size(110,32),Font=AppPalette.Font(9)};savePrivateMessage.Click+=delegate{SaveInlinePrivateMessage();};
+            completeProfile=new RoundButton {Text="更多消息设置",Primary=false,Location=new Point(136,236),Size=new Size(156,32),Font=AppPalette.Font(9)};completeProfile.Click+=delegate{var item=roster.SelectedItem as RosterItem;if(item!=null&&item.Kind=="group")OpenGroupTask(false,item.ConversationId);else if(item!=null&&!item.Sendable&&item.Kind=="private")CompleteRosterProfile(item);else{ShowFixedMessage();RefreshDashboard();ShowRosterDetail();}};
+            preview.Controls.AddRange(new Control[]{privateMessageTitle,detailPreview,detailHint,privateMessageStatus,savePrivateMessage,completeProfile});right.Controls.Add(preview,0,1);
             var history=new CardSurface {Dock=DockStyle.Fill,Margin=new Padding(0,0,0,10),Padding=new Padding(10)};var hHead=new Panel {Dock=DockStyle.Top,Height=32};var hTitle=ViewLabel("最近发送记录",10,true);hTitle.SetBounds(6,0,180,28);var export=SmallAction("导出","download",delegate{ExportHistory();});export.Dock=DockStyle.Right;hHead.Controls.Add(hTitle);hHead.Controls.Add(export);
             var tableBody=new Panel {Dock=DockStyle.Fill};dgv=new DataGridView {Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false};dgv.DataBindingComplete+=delegate{FormatHistory();};dgv.CellPainting+=PaintHistoryStatus;
             dgv.CellFormatting+=delegate(object sender,DataGridViewCellFormattingEventArgs e){if(e.RowIndex>=0&&e.ColumnIndex>=0&&dgv.Columns[e.ColumnIndex].Name=="时间"){DateTime stamp;if(DateTime.TryParse(Convert.ToString(e.Value),out stamp)){e.Value=stamp.Date==DateTime.Today?stamp.ToString("HH:mm"):stamp.ToString("MM-dd");e.FormattingApplied=true;}}};
@@ -128,9 +133,8 @@ namespace DouyinSpark
             detailName.Text=item==null?"选择一个联系人":item.Name;
             detailKind.Text=item==null?"导入私信好友和群聊后，在此查看详情":item.Kind=="group"?"群聊 · 独立任务":"私信好友";
             detailState.Text=item==null?"":item.Kind=="group"?"可单独设置消息及每日定时":item.Subtitle;
-            detailPreview.Text=item==null?"选择联系人后查看消息示例。":item.Kind=="group"?(string.IsNullOrWhiteSpace(groupPlan.message)?"尚未设置群聊消息。":groupPlan.message):PreviewMessage();
-            detailHint.Text=item==null?"预览不会触发发送":item.Kind=="group"?"群聊使用独立任务，提交状态与送达分开记录。":!item.Sendable?"补齐并核对个人主页后，才能加入私信发送。":fixedMessage.Length>0?"本轮统一固定消息；上方按钮发送全部可用私信。":"语录示例，实际按规则抽取；上方按钮发送全部可用私信。";
-            completeProfile.Enabled=item!=null;completeProfile.Text=item!=null&&item.Kind=="group"?"打开群聊消息任务":item!=null&&!item.Sendable?"补全主页并加入私信":"统一消息设置";
+            RefreshPrivateMessageEditor(item!=null&&item.Kind=="group");
+            completeProfile.Enabled=true;completeProfile.Text=item!=null&&item.Kind=="group"?"打开群聊消息任务":item!=null&&!item.Sendable?"补全主页并加入私信":"更多消息设置";
             FilterRosterHistory();
         }
         static void FilterRosterHistory()

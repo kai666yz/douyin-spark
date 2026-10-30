@@ -42,6 +42,7 @@ namespace DouyinSpark
             if(themeButton!=null)themeButton.Text=AppPalette.Dark?"浅色模式":"深色模式";
             if(actionsMenu!=null){actionsMenu.BackColor=AppPalette.Surface;actionsMenu.ForeColor=AppPalette.Text;}
             FormatHistory();
+            RefreshPrivateMessageStatus();
         }
         static void RefreshDashboard()
         {

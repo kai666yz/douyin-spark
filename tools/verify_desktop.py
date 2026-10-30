@@ -31,7 +31,7 @@ with (qa/'logs/spark_log.csv').open('w',encoding='utf-8-sig',newline='') as file
 (qa/'FakeBackend.cs').write_text(r'''
 using System;using System.IO;using System.Threading;
 class FakeBackend{static void Main(string[] a){Console.OutputEncoding=new System.Text.UTF8Encoding(false);string root=AppDomain.CurrentDomain.BaseDirectory;
- if(Array.IndexOf(a,"--environment-check")>=0){string v=File.Exists(Path.Combine(root,"bad_version"))?"0.0.0":"2.4.0";Console.WriteLine("{\"app_version\":\""+v+"\",\"python_version\":\"fixture\",\"playwright_version\":\"fixture\"}");return;}
+ if(Array.IndexOf(a,"--environment-check")>=0){string v=File.Exists(Path.Combine(root,"bad_version"))?"0.0.0":"2.4.2";Console.WriteLine("{\"app_version\":\""+v+"\",\"python_version\":\"fixture\",\"playwright_version\":\"fixture\"}");return;}
  int index=Array.IndexOf(a,"--stop-after-current");if(index<0)throw new Exception("fixture requires stop flag");string flag=a[index+1];Console.WriteLine("TASK|PLANNED|4");Console.WriteLine("RESULT|https://www.douyin.com/user/fixture|OK");Console.WriteLine("PROGRESS|1|4|本地测试|OK");
  for(int i=0;i<300&&!File.Exists(flag);i++)Thread.Sleep(50);if(!File.Exists(flag))throw new Exception("no stop flag");Console.WriteLine("TASK|CANCELLED|3");
 }}

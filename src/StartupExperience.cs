@@ -105,7 +105,7 @@ namespace DouyinSpark
             if(BrowserPath(GetBrowserChoice()).Length==0){Log("定时未发送：发送浏览器不可用，请打开环境与数据检查。");return;}
             // Persist before dispatch so a restart cannot repeat today's attempt.
             var config=ReadConfig();config["schedule_last_trigger_date"]=now.ToString("yyyy-MM-dd");SparkStorage.WriteJson(Path.Combine(BaseDir,"config.json"),config);scheduleLastTrigger=now.ToString("yyyy-MM-dd");
-            if(!CheckSafetyResume(mainForm,false))return;Log("定时到点，开始发送私信。");DoStart();
+            if(!CheckSafetyResume(mainForm,false))return;Log("定时到点，使用已保存的消息开始发送私信。");StartPrivateSend(true);
         }
     }
 

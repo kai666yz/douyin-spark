@@ -25,6 +25,7 @@ namespace DouyinSpark
             bool stoppable=(privateRunActive&&!privateStopRequested)||groupTaskRunning;
             if(btnStop!=null){btnStop.Enabled=stoppable;btnStop.Text=privateRunActive&&privateStopRequested?"停止已请求":"停止发送";}
             if(taskStop!=null){taskStop.Enabled=stoppable;taskStop.Text=btnStop!=null?btnStop.Text:"停止发送";}
+            RefreshPrivateMessageStatus();
         }
         static void RequestStopSending()
         {

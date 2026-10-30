@@ -33,7 +33,7 @@ def main():
         shutil.copy2(bootstrapper,stage/'runtime'/bootstrapper.name)
         if (ROOT/'docs').is_dir():
             (stage/'docs').mkdir()
-            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png','ui-tasks.png','ui-settings.png','ui-group-task.png','spark-icon.png','startup-stages.png','selection-following.png','selection-conversations.png','ui-group-random.png','ui-group-rotation.png','benchmark-v2.4.0.json','benchmark-v2.4.0.csv'):
+            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png','ui-tasks.png','ui-settings.png','ui-group-task.png','spark-icon.png','startup-stages.png','selection-following.png','selection-conversations.png','ui-group-random.png','ui-group-rotation.png','message-saved.png','message-unsaved.png','benchmark-v2.4.0.json','benchmark-v2.4.0.csv'):
                 if (ROOT/'docs'/name).is_file():shutil.copy2(ROOT/'docs'/name,stage/'docs'/name)
         pool=json.loads((ROOT/'sentences_pool.json').read_text('utf-8-sig'))
         # Never publish local custom messages or a personal category selection.
@@ -81,11 +81,14 @@ def main():
 群间间隔可调15～600秒，默认60秒；群聊独立消息与每日定时。
 群聊后端按会话ID核对软件网页，提交后轮询新增消息；页面确认不等于服务器送达或火花延续。
 随机和轮换语录当天不重句，跨天重置；旧固定消息保持固定模式。出现安全暂停需人工处理后确认恢复。
-网页未取得明确证据时记为待核对，不等于送达；结果不确定不自动重发，已有草稿保留。
+网页未取得明确证据时记为待核对，不等于送达；结果不确定不自动重发。群聊已有草稿保留。
+私信发送前清空目标输入框的旧草稿，再填入本轮消息；清空失败明确报错，不拼接发送。
 本包的好友名单为空，不含任何登录状态。旧版关注导入及手动添加入口保留。
 读取时可取消；失败、空结果和部分结果不覆盖关注缓存，更不会覆盖原好友名单。
 部分结果需确认后勾选导入，未读取成功可查看诊断或手动添加。
-私信固定消息：消息任务 → 私信问候 → 消息内容。留空则使用语录池。
+私信固定消息：联系人右侧直接输入，点“保存消息”或Ctrl+S；显示“已保存”后，手动和定时均使用该固定消息，重启保留。
+修改后显示“未保存”，切换联系人或刷新不丢草稿。手动开始前提醒保存，定时只用上次保存的内容。群聊独立设置。
+恢复语录池：点击“更多消息设置”，留空后保存。
 托盘：最小化或关闭窗口后继续在托盘运行；右键托盘选择退出。
 历史：设置 → 数据与记录。群聊发送记录独立核对及导出CSV。
 验证码需在浏览器中手动处理；程序不会自动解验证码或切换身份规避验证。

@@ -22,7 +22,7 @@ namespace DouyinSpark
         static Label lblStatus;
         static SparkProgress progress;
         static string scheduleTime = "";     // 每日定时 "HH:mm"
-        const string AppVersion = "2.4.0";
+        const string AppVersion = "2.4.2";
 
         // HelloKitty 主题别名（Program 内直接使用）
         static readonly Color KPink = KittyTheme.KPink;
@@ -437,7 +437,11 @@ namespace DouyinSpark
         }
 
         static void DoStart()
+        {StartPrivateSend(false);}
+
+        static void StartPrivateSend(bool scheduled)
         {
+            if(!scheduled&&!RequireSavedPrivateMessage())return;
             if(SendCooling){Log("停止后的冷却中，请稍候再开始。");return;}
             if(!CheckSafetyResume(mainForm,true))return;
             if(BrowserPath(GetBrowserChoice()).Length==0){Log("发送浏览器未找到，请先完成环境检查。");ShowEnvironment();return;}
