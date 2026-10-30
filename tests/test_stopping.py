@@ -29,6 +29,7 @@ async def fake_send(friend, message):
 class Page:
     url='https://www.douyin.com/'
     async def goto(self,*a,**kw): pass
+    async def wait_for_load_state(self,*a,**kw): pass
     async def wait_for_timeout(self,*a): pass
     async def close(self): pass
     def set_default_timeout(self,*a): pass

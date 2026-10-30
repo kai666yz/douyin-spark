@@ -13,7 +13,7 @@ namespace DouyinSpark
                 var entry=entries.OrderByDescending(x=>x.time).ThenByDescending(x=>new[]{"SUBMITTED","UNCONFIRMED","CONFIRMED","OK"}.Contains(x.status)?1:0).First();
                 if(entry.status=="CONFIRMED"||entry.status=="OK")result.Succeeded++;
                 else if(entry.status=="SUBMITTED"||entry.status=="UNCONFIRMED")result.Unconfirmed++;
-                else if(entry.status!="CANCELLED")result.Failed++;
+                else if(entry.status!="CANCELLED"&&entry.status!="STOPPED")result.Failed++;
             }
             result.Pending=Math.Max(0,result.Total-result.Processed);return result;
         }

@@ -16,7 +16,9 @@ namespace DouyinSpark
         public string conversation_id {get;set;}
         public string source {get;set;}
         public string updated_at {get;set;}
-        public bool CanSend {get{return kind=="private" && FriendRecord.ValidUrl(url);}}
+        public bool CanSend {get{return CanSendPrivate || kind=="group"&&!string.IsNullOrWhiteSpace(conversation_id);}}
+        [System.Web.Script.Serialization.ScriptIgnore]
+        public bool CanSendPrivate {get{return kind=="private"&&FriendRecord.ValidUrl(url);}}
         public static ConversationRecord Normalize(ConversationRecord item)
         {
             if(item==null || string.IsNullOrWhiteSpace(item.name))throw new InvalidDataException("会话缺少名称。");

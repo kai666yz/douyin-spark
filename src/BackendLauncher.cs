@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -39,7 +39,7 @@ namespace DouyinSpark
             }
             return result.Append('\\', slashes * 2).Append('"').ToString();
         }
-        static ProcessStartInfo BackendInfo(string arguments)
+        internal static ProcessStartInfo BackendInfo(string arguments)
         {
             string exe = FindBackend();
             var psi = new ProcessStartInfo();

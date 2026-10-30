@@ -20,7 +20,7 @@ namespace DouyinSpark
         static void RefreshSendButtons()
         {
             int seconds=Math.Max(0,(int)Math.Ceiling((sendCooldown-DateTime.UtcNow).TotalSeconds));
-            if(btnStart!=null){btnStart.Enabled=!privateRunActive&&!groupTaskRunning&&seconds==0;btnStart.Text=privateRunActive?(privateStopRequested?"正在停止…":"正在发送…"):seconds>0?"稍候 "+seconds+" 秒":"开始发送";}
+            if(btnStart!=null){btnStart.Enabled=!privateRunActive&&seconds==0;btnStart.Text=privateRunActive?(privateStopRequested?"正在停止…":"正在发送…"):seconds>0?"稍候 "+seconds+" 秒":"开始发送";}
             if(taskStart!=null){taskStart.Enabled=btnStart.Enabled;taskStart.Text=btnStart.Text;}
             bool stoppable=(privateRunActive&&!privateStopRequested)||groupTaskRunning;
             if(btnStop!=null){btnStop.Enabled=stoppable;btnStop.Text=privateRunActive&&privateStopRequested?"停止已请求":"停止发送";}
@@ -28,17 +28,17 @@ namespace DouyinSpark
         }
         static void RequestStopSending()
         {
-            if(groupTaskRunning&&groupWindow!=null){groupWindow.RequestStop();return;}
-            if(!privateRunActive||privateStopRequested)return;
-            int pending=Math.Max(0,privateTotal-privateDone);
-            string counts=privateTotal>0?"已发（已确认） "+privateSucceeded+" / 未处理 "+pending+"\n待核对 "+privateUnconfirmed+" / 已处理 "+privateDone:"正在核对本轮名单";
+            if(!privateRunActive){if(groupTaskRunning&&groupWindow!=null)groupWindow.RequestStop();return;}
+            if(privateStopRequested)return;
+            int pending=Math.Max(0,privateTotal-privateDone)+(groupTaskRunning&&groupWindow!=null?groupWindow.PendingCount:0);
+            string counts=privateTotal>0?"已发（页面确认） "+(privateSucceeded+(groupTaskRunning&&groupWindow!=null?groupWindow.SentCount:0))+" / 未处理 "+pending+"\n待核对 "+(privateUnconfirmed+(groupTaskRunning&&groupWindow!=null?groupWindow.AwaitingCount:0))+" / 已处理 "+privateDone:"正在核对本轮名单";
             if(MessageBox.Show(mainForm,counts+"\n当前联系人处理结束后停止，其余标记为已取消。\n已发送的消息不会撤回；停止后需等待10秒才可再次开始。","停止发送",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
-            try{File.WriteAllText(privateStopFile,"stop");privateStopRequested=true;Log("已请求停止："+counts+"，等待当前联系人结束。");RefreshSendButtons();}
+            try{File.WriteAllText(privateStopFile,"stop");privateStopRequested=true;if(groupTaskRunning&&groupWindow!=null)groupWindow.StopWithoutConfirmation();Log("已请求停止："+counts+"，等待当前联系人结束。");RefreshSendButtons();}
             catch(Exception ex){MessageBox.Show(mainForm,"停止请求未能保存，请重试。\n"+ex.Message,"未停止");}
         }
         static async void StartPrivateRun()
         {
-            if(privateRunActive||SendCooling||groupTaskRunning)return;
+            if(privateRunActive||SendCooling)return;
             privateRunActive=true;privateStopRequested=false;privateDone=privateTotal=privateSucceeded=privateUnconfirmed=0;privateResults.Clear();
             privateStopFile=Path.Combine(BaseDir,"logs","private_stop_"+Guid.NewGuid().ToString("N")+".flag");RefreshSendButtons();
             progress.Reset();progress.Done=progress.Total=0;progress.Info="检查发送名单…";

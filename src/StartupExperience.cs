@@ -100,12 +100,12 @@ namespace DouyinSpark
             if(now>=nextScheduled){bool due=SchedulePolicy.Due(now,nextScheduled,schedulePaused,scheduleLastTrigger);nextScheduled=SchedulePolicy.Next(now,scheduleTime);if(due)privateQueueUntil=now.AddMinutes(10);else Log("已跳过错过的定时，等待下一次计划时间。");}
             if(privateQueueUntil==DateTime.MinValue)return;
             if(now>privateQueueUntil){privateQueueUntil=DateTime.MinValue;Log("私信定时排队超过10分钟，本次跳过。");return;}
-            if(!btnStart.Enabled||SendCooling||importingFollowing!=0||groupTaskRunning)return;
+            if(!btnStart.Enabled||SendCooling||importingFollowing!=0)return;
             privateQueueUntil=DateTime.MinValue;
             if(BrowserPath(GetBrowserChoice()).Length==0){Log("定时未发送：发送浏览器不可用，请打开环境与数据检查。");return;}
             // Persist before dispatch so a restart cannot repeat today's attempt.
             var config=ReadConfig();config["schedule_last_trigger_date"]=now.ToString("yyyy-MM-dd");SparkStorage.WriteJson(Path.Combine(BaseDir,"config.json"),config);scheduleLastTrigger=now.ToString("yyyy-MM-dd");
-            Log("定时到点，开始发送私信。");DoStart();
+            if(!CheckSafetyResume(mainForm,false))return;Log("定时到点，开始发送私信。");DoStart();
         }
     }
 

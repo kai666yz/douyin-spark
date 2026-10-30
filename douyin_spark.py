@@ -14,6 +14,8 @@
 import json, csv, os, sys, time, random, argparse, re
 from datetime import datetime
 from pathlib import Path
+from spark_delivery import (warmup, sending_slot, safety_stop, Pace, interruptible_delay, DailyPhrases, timing)
+from spark_private import send_private
 from spark_support import (VERSION, data_dir, history_paths, rotate_csv, export_history, clear_history, wait_for_verification, acquire_task_lock)
 
 # 修复 exe 启动子进程时 GBK 编码崩溃（好友名含 emoji 如 🐷🦀）
@@ -94,7 +96,7 @@ def load_json(p):
     from spark_support import read_json
     return read_json(p)
 
-def pick_sentences(n=23, avoid_days=7, on_date=None):
+def pick_sentences(n=23, avoid_days=1, on_date=None):
     """抽句子：按启用的分类抽，当天有节日主题则优先用节日句"""
     pool = load_json(POOL_FILE)
     # 兼容旧格式：无 categories 时用 sentences
@@ -118,7 +120,7 @@ def pick_sentences(n=23, avoid_days=7, on_date=None):
             for row in csv.DictReader(f):
                 try:
                     ts = datetime.strptime(row["time"], "%Y-%m-%d %H:%M:%S").timestamp()
-                    if ts >= cutoff:
+                    if (row["time"].startswith(d.strftime("%Y-%m-%d")) if avoid_days==1 else ts>=cutoff):
                         used.add(row["message"])
                 except (ValueError, KeyError):
                     pass
@@ -292,14 +294,26 @@ def main():
     ap.add_argument("--no-sleep", action="store_true", help="不等待")
     ap.add_argument("--friends-file", type=Path, default=FRIENDS_FILE, help="本次选中的好友名单")
     ap.add_argument("--cancel-file", type=Path, help="存在时停止后续发送")
+    ap.add_argument("--group-run", type=Path, help="软件生成的群聊会话任务（仅本机网页）")
+    ap.add_argument("--preview-group", action="store_true", help="只预览群聊消息来源，不启动网页")
     ap.add_argument("--stop-after-current", type=Path, help="当前联系人处理完后停止，剩余联系人记录为已取消")
     args = ap.parse_args()
     if args.message is not None and not args.message.strip():
         ap.error("--message 不能是空白文本")
+    if args.group_run:
+        from spark_group import main as group_main
+        group_main(BASE,args.group_run,args.stop_after_current)
+        return
+    if args.preview_group:
+        from spark_delivery import group_candidates
+        plan=load_json(BASE / "group_task.json")
+        mode,candidates=group_candidates(BASE,plan)
+        print(json.dumps({"mode":mode,"sample":candidates[:3],"count":len(candidates)},ensure_ascii=False))
+        return
     task_handle = None
     if not args.dry_run and not args.runtime_check and not args.export_history and not args.environment_check:
         try:
-            task_handle = acquire_task_lock(BASE / '.spark-task.lock')
+            task_handle = acquire_task_lock(BASE / ('.spark-task.lock' if args.fetch_following else '.spark-private-run.lock'))
         except RuntimeError as exc:
             ap.error(str(exc))
     if args.fetch_following:
@@ -339,6 +353,8 @@ def main():
             browser.close()
         print('运行环境检查通过：未访问抖音，未发送消息。')
         return
+    if not args.dry_run and not args.selftest and (BASE/".spark-safety-stop.json").exists():
+        raise RuntimeError("发送已安全暂停，请在软件中完成人工检查并确认恢复。")
     if not args.dry_run:
         rotate_csv(LOG_FILE)
     if not args.friends_file.exists():
@@ -412,6 +428,11 @@ def main():
         print("\n[dry-run] 不启动浏览器，不发送。")
         return
 
+    phrase_candidates=pick_sentences(n=100000) if args.message is None else []
+    if args.message is None and not args.selftest:
+        if not phrase_candidates: raise ValueError("今天可用语录为空，请增加分类或使用固定消息。")
+        msgs=[""]*len(friends)
+
     from playwright.sync_api import sync_playwright
     if args.selftest:
         with sync_playwright() as p:
@@ -476,145 +497,26 @@ def main():
     done_count = [0]            # 已处理人数（进度上报）
     total_count = [len(friends)]  # 总人数（第一轮）
 
+    first_contact=[True]
+    pace=Pace()
+    phrases=DailyPhrases(BASE)
+    def message_candidates():
+        pool=load_json(POOL_FILE);cats=pool.get('categories',{});active=pool.get('active_categories',[])
+        normal=[s for key in active for s in cats.get(key,[])] if cats and active else pool.get('sentences',[])
+        normal=normal or pool.get('sentences',[])
+        used=phrases.state()
+        themed=pool.get('holiday',{}).get(datetime.now().strftime('%m-%d'),[])
+        themed=[s for s in themed if isinstance(s,str) and phrases.digest(s) not in used]
+        return themed or normal
     async def send_one_async(page, friend, msg, cancel_file=None):
-        name, url = friend["name"], friend["url"]
-        submitted = False
-        try:
-            if cancel_file and Path(cancel_file).exists():
-                return ("CANCELLED", "已取消后续发送")
-            if halted[0]:
-                return ("STOPPED", "任务已暂停或停止")
-            sec_uid = url.rstrip("/").rsplit("/", 1)[-1]
-            # 导航 + URL 校验重试（并发时可能被抖音重定向或 ERR_ABORTED）
-            for attempt in range(3):
-                try:
-                    await page.goto(url, wait_until="domcontentloaded", timeout=25000)
-                except Exception as ge:
-                    if attempt == 2:
-                        return ("ERROR", "导航失败: " + str(ge)[:80])
-                    await page.wait_for_timeout(2500)
-                    continue
-                await page.wait_for_timeout(1800)
-                if not await wait_for_verification(page, lambda: show_chrome_window(browser_targets(read_browser_choice())['title']), cancel_file):
-                    halted[0] = True
-                    return ("CAPTCHA", "需要人工验证，任务已停止")
-                body_text = await page.locator('body').inner_text(timeout=3000)
-                if any(text in body_text for text in ('操作过于频繁', '访问过于频繁')):
-                    halted[0] = True
-                    print('ATTENTION|RATE_LIMIT|页面提示操作频繁，本次任务停止。', flush=True)
-                    return ("RATE_LIMIT", "请稍后人工重试")
-                cur = page.url
-                if "login" in cur or "passport" in cur:
-                    return ("LOGIN_EXPIRED", "登录态失效，请重新扫码")
-                if sec_uid in cur:
-                    break
-                if attempt == 2:
-                    try:
-                        dbg = await page.locator('body').inner_text()
-                        print(f"    [dbg] {name} 3次导航都被重定向, cur={cur[-40:]}, body={dbg[:100].replace(chr(10),' | ')}", flush=True)
-                    except Exception:
-                        pass
-                    return ("NO_BTN", "主页被重定向，未到达好友页")
-                await page.wait_for_timeout(2500)
-            btn = None
-            for loc in [
-                page.get_by_role("button", name="私信"),
-                page.locator('div[class*="button"]:has-text("私信")'),
-                page.locator('text="私信"').first,
-            ]:
-                try:
-                    if await loc.count() > 0 and await loc.first.is_visible():
-                        btn = loc.first
-                        break
-                except Exception:
-                    continue
-            if btn is None:
-                try:
-                    dbg = await page.locator('body').inner_text()
-                    print(f"    [dbg] {name} 主页无私信按钮, url={url[-30:]}, body={dbg[:120].replace(chr(10),' | ')}", flush=True)
-                except Exception:
-                    pass
-                return ("NO_BTN", "没找到私信按钮")
-
-            async def _find_editor(timeout_s=14):
-                deadline = time.monotonic() + timeout_s
-                while time.monotonic() < deadline:
-                    try:
-                        ed = page.locator('div[contenteditable="true"]:visible')
-                        if await ed.count() > 0:
-                            return ed.first
-                    except Exception:
-                        pass
-                    await page.wait_for_timeout(1000)
-                return None
-
-            try:
-                await btn.click(timeout=4000)
-            except Exception:
-                try:
-                    await btn.click(force=True, timeout=4000)
-                except Exception:
-                    await page.reload(wait_until="domcontentloaded")
-                    await page.wait_for_timeout(2500)
-                    b2 = page.get_by_role("button", name="私信")
-                    if await b2.count() > 0:
-                        await b2.first.click(timeout=6000)
-
-            editor = await _find_editor(14)
-            if editor is None:
-                await page.reload(wait_until="domcontentloaded")
-                await page.wait_for_timeout(2500)
-                b3 = page.get_by_role("button", name="私信")
-                if await b3.count() > 0:
-                    await b3.first.click(timeout=6000)
-                editor = await _find_editor(14)
-            if editor is None:
-                try:
-                    dbg = await page.locator('body').inner_text()
-                    print(f"    [dbg] {name} 聊天窗未开, url={url[-30:]}, body={dbg[:150].replace(chr(10),' | ')}", flush=True)
-                    await page.screenshot(path=str(LOG_DIR / ("dbg_" + name + ".png")))
-                except Exception:
-                    pass
-                return ("NO_INPUT", "聊天窗未弹出或找不到输入框")
-            if cancel_file and Path(cancel_file).exists():
-                return ("CANCELLED", "已取消后续发送")
-            if not await wait_for_verification(page, lambda: show_chrome_window(browser_targets(read_browser_choice())['title']), cancel_file):
-                halted[0] = True
-                return ("CAPTCHA", "需要人工验证")
-            previous_matches = 0
-            for frame in page.frames:
-                try:
-                    previous_matches += await frame.get_by_text(msg, exact=True).count()
-                except Exception:
-                    pass
-            await editor.click()
-            await page.wait_for_timeout(300)
-            await editor.type(msg, delay=20)
-            await page.wait_for_timeout(250)
-            if cancel_file and Path(cancel_file).exists():
-                return ("CANCELLED", "已取消，未按下发送键")
-            submitted = True
-            append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", name, url, msg, "UNCONFIRMED", "提交前记录；中断后请人工确认，避免重复发送"]])
-            await page.keyboard.press("Enter")
-            await page.wait_for_timeout(1500)
-            if not await wait_for_verification(page, lambda: show_chrome_window(browser_targets(read_browser_choice())['title']), cancel_file):
-                halted[0] = True
-                return ("UNCONFIRMED", "发送触发验证且未完成，请人工确认结果")
-            # 确认发送：跨 frame 找刚发的消息文本
-            try:
-                matches = 0
-                for f in page.frames:
-                    try:
-                        matches += await f.get_by_text(msg, exact=True).count()
-                    except Exception:
-                        continue
-                if matches > previous_matches:
-                    return ("OK", msg)
-                return ("UNCONFIRMED", "已尝试发送但未确认，请人工查看；不会自动重发")
-            except Exception:
-                return ("UNCONFIRMED", "发送结果不确定，请人工查看")
-        except Exception as e:
-            return ("UNCONFIRMED" if submitted else "ERROR", str(e)[:120])
+        async def verify(current):
+            result=await wait_for_verification(current,lambda:show_chrome_window(browser_targets(read_browser_choice())['title']),cancel_file)
+            if not result:safety_stop(BASE,'安全验证未完成')
+            return result
+        def journal():
+            append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}",friend['name'],friend['url'],msg,'UNCONFIRMED','提交前记录；中断后请人工确认']])
+        first=first_contact[0];first_contact[0]=False
+        return await send_private(page,friend,msg,BASE,verify,journal,lambda:bool(cancel_file and Path(cancel_file).exists()),first)
 
     def soft_stopped():
         return bool(args.stop_after_current and args.stop_after_current.exists())
@@ -626,25 +528,19 @@ def main():
         page.set_default_timeout(15000)
         out = []
         for f, m in group:
-            if halted[0] or soft_stopped():
+            if halted[0] or soft_stopped() or (BASE/".spark-safety-stop.json").exists():
                 break
             if cancel_file and Path(cancel_file).exists():
                 break
-            try:
-                status, note = await send_one_async(page, f, m, cancel_file)
-            except Exception as e:
-                # 页面/浏览器被关闭时重建页面继续
+            async with sending_slot(BASE,lambda:soft_stopped() or (BASE/".spark-safety-stop.json").exists()) as acquired:
+                if not acquired:break
+                owner=None
                 try:
-                    await page.close()
-                except Exception:
-                    pass
-                page = await ctx.new_page()
-                page.set_default_timeout(15000)
-                status, note = ("ERROR", "页面重建后重发: " + str(e)[:60])
-                try:
-                    status, note = await send_one_async(page, f, m, cancel_file)
-                except Exception as e2:
-                    status, note = ("ERROR", str(e2)[:80])
+                    if args.message is None:m,owner=phrases.reserve(message_candidates())
+                    status,note=await send_one_async(page,f,m,cancel_file)
+                except Exception as ex:status,note='ERROR',str(ex)[:120]
+                finally:
+                    if owner:phrases.finish(m,owner,status in ('OK','UNCONFIRMED'))
             out.append((f, m, status, note))
             append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", f['name'], f['url'], m, status, note]])
             print(f"RESULT|{f['url']}|{status}", flush=True)
@@ -654,17 +550,12 @@ def main():
             print(f"PROGRESS|{done_count[0]}|{total_count[0]}|{f['name']}|{status}", flush=True)
             if status in ("LOGIN_EXPIRED", "CAPTCHA", "RATE_LIMIT", "STOPPED"):
                 halted[0] = True
+                if status in ("RATE_LIMIT","CAPTCHA","LOGIN_EXPIRED"):safety_stop(BASE,"页面需要人工处理："+status)
                 break
-            if not args.no_sleep:
-                try:
-                    await page.wait_for_timeout(int(random.uniform(1.5, 2.5) * 1000))
-                except Exception:
-                    try:
-                        await page.close()
-                    except Exception:
-                        pass
-                    page = await ctx.new_page()
-                    page.set_default_timeout(15000)
+            delay=pace.observe(status)
+            timing(BASE,'private','result',0,status=status,delay=delay,done=done_count[0])
+            if not args.no_sleep and done_count[0]<total_count[0]:
+                if not await interruptible_delay(delay,soft_stopped):break
         try:
             await page.close()
         except Exception:
@@ -683,12 +574,16 @@ def main():
                 await asyncio.sleep(2**(attempt+1))
                 if soft_stopped():
                     break
-                page = await ctx.new_page()
-                page.set_default_timeout(15000)
-                try:
-                    status, note = await send_one_async(page, f, m, cancel_file)
-                finally:
-                    await page.close()
+                async with sending_slot(BASE,lambda:soft_stopped() or (BASE/".spark-safety-stop.json").exists()) as acquired:
+                    if not acquired:break
+                    page = await ctx.new_page();page.set_default_timeout(15000);owner=None
+                    try:
+                        if args.message is None:m,owner=phrases.reserve(message_candidates())
+                        status,note=await send_one_async(page,f,m,cancel_file)
+                    except Exception as ex:status,note='ERROR',str(ex)[:120]
+                    finally:
+                        if owner:phrases.finish(m,owner,status in ('OK','UNCONFIRMED'))
+                        await page.close()
                 append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", f['name'], f['url'], m, status, note]])
                 print(f"RESULT|{f['url']}|{status}", flush=True)
                 if status not in ('ERROR','NO_BTN','NO_INPUT'):
@@ -710,8 +605,8 @@ def main():
                 launch_kw["channel"] = tg["channel"]
             ctx = await p.chromium.launch_persistent_context(**launch_kw)
             login_page = ctx.pages[0] if ctx.pages else await ctx.new_page()
-            await login_page.goto("https://www.douyin.com/", wait_until="domcontentloaded", timeout=30000)
-            await login_page.wait_for_timeout(3000)
+            warmed=await warmup(login_page)
+            timing(BASE,"private","warmup",warmed)
             if "login" in login_page.url or "passport" in login_page.url:
                 print("\n*** 需要登录：已把 Chrome 窗口移到屏幕中央，请扫码登录，程序会自动继续 ***", flush=True)
                 show_chrome_window(tg["title"])
@@ -721,6 +616,8 @@ def main():
                     if "login" not in login_page.url and "passport" not in login_page.url:
                         break
                     await login_page.wait_for_timeout(1000)
+                if "login" in login_page.url or "passport" in login_page.url:
+                    raise RuntimeError("登录未完成，未开始发送；请完成扫码后重试。")
                 print("登录检测通过，开始发送。", flush=True)
             await login_page.close()
             # 窗口已通过 --window-position 置于屏幕外，全程不抢前台
@@ -757,7 +654,9 @@ def main():
             await ctx.close()
             return results
 
+    batch_started=time.monotonic()
     results = asyncio.run(run())
+    timing(BASE,"private","batch",time.monotonic()-batch_started,targets=len(friends),concurrency=1)
     rows = []
     ok, fail, cancelled = 0, 0, 0
     for chunk in results:

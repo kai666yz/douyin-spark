@@ -33,7 +33,7 @@ def main():
         shutil.copy2(bootstrapper,stage/'runtime'/bootstrapper.name)
         if (ROOT/'docs').is_dir():
             (stage/'docs').mkdir()
-            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png','ui-tasks.png','ui-settings.png','ui-group-task.png','spark-icon.png','startup-stages.png','selection-following.png','selection-conversations.png'):
+            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png','ui-tasks.png','ui-settings.png','ui-group-task.png','spark-icon.png','startup-stages.png','selection-following.png','selection-conversations.png','ui-group-random.png','ui-group-rotation.png','benchmark-v2.4.0.json','benchmark-v2.4.0.csv'):
                 if (ROOT/'docs'/name).is_file():shutil.copy2(ROOT/'docs'/name,stage/'docs'/name)
         pool=json.loads((ROOT/'sentences_pool.json').read_text('utf-8-sig'))
         # Never publish local custom messages or a personal category selection.
@@ -74,11 +74,14 @@ def main():
 日常浏览器、旧版发送浏览器、内嵌网页的登录状态彼此独立，不会复制或覆盖。
 可直接选择上次读取的会话；新会话点登录/刷新，在软件内打开消息后读取。
 群聊可在消息任务中独立选择、填写消息及启用定时；不会混入私信发送。
-今日私信和今日群聊可切换查看，群聊采用独立窗口。任务可同时启用，执行时顺序排队。
+侧边栏群聊消息一屏选择目标、随机分类/固定消息/多条轮换、每日定时。
+今日私信/今日群聊可切换；两类共用一个发送名额，每个会话结束后交替处理，不启用多路并发。
 首页与消息任务页可停止发送：私信当前联系人结束后停止，剩余标已取消；停止后冷却10秒。
 选择窗口支持整行勾选、全选/全不选、今日未发送筛选、Ctrl+A与实时已选数。
 群间间隔可调15～600秒，默认60秒；群聊独立消息与每日定时。
-群聊网页提交仅记为待核对，不等于送达；结果不确定不自动重发，已有草稿保留。
+群聊后端按会话ID核对软件网页，提交后轮询新增消息；页面确认不等于服务器送达或火花延续。
+随机和轮换语录当天不重句，跨天重置；旧固定消息保持固定模式。出现安全暂停需人工处理后确认恢复。
+网页未取得明确证据时记为待核对，不等于送达；结果不确定不自动重发，已有草稿保留。
 本包的好友名单为空，不含任何登录状态。旧版关注导入及手动添加入口保留。
 读取时可取消；失败、空结果和部分结果不覆盖关注缓存，更不会覆盖原好友名单。
 部分结果需确认后勾选导入，未读取成功可查看诊断或手动添加。

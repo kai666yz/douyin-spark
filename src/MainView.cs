@@ -55,7 +55,7 @@ namespace DouyinSpark
                 overview.ModeText=fixedMessage.Length>0?"固定消息":"分类语录";
                 if(groupOverview){var attempts=GroupJournal.Read(BaseDir,DateTime.Now);overview.Summary=GroupSummary.Build(groupPlan.targets.Union(attempts.Select(x=>x.group_id)),attempts,DateTime.Now);overview.NextText=string.IsNullOrEmpty(groupPlan.schedule)?"尚未设置群聊定时":groupPlan.paused?"群聊定时已暂停":"群聊每日 · "+groupPlan.schedule;overview.ModeText="独立群聊消息";}
                 overview.AccessibleName="今日已处理 "+overview.Summary.Processed+" / "+overview.Summary.Total+"，成功 "+overview.Summary.Succeeded+"，失败 "+overview.Summary.Failed+"，待发 "+overview.Summary.Pending+"，待确认 "+overview.Summary.Unconfirmed+"。"+overview.NextText;
-                overview.StateText=privateRunActive?(privateStopRequested?"等待当前联系人结束":"私信发送中"):groupTaskRunning?"群聊发送中":SendCooling?"停止冷却中":"准备就绪";overview.Busy=privateRunActive||groupTaskRunning;overview.Invalidate();RefreshRoster();RefreshTaskWorkspace();
+                overview.StateText=privateRunActive&&groupTaskRunning?"单路发送 · 按会话交替":privateRunActive?(privateStopRequested?"等待当前联系人结束":"私信发送中"):groupTaskRunning?"群聊发送中":SendCooling?"停止冷却中":"准备就绪";overview.Busy=privateRunActive||groupTaskRunning;overview.Invalidate();RefreshRoster();RefreshTaskWorkspace();RefreshEnvironmentBanner();
             }
             catch(Exception){overview.NextText="记录正在更新…";overview.Invalidate();}
         }

@@ -12,8 +12,9 @@ namespace DouyinSpark
         static void RefreshEnvironmentBanner()
         {
             if(readiness==null||readiness.IsDisposed)return;
-            readiness.Attention=schedulePaused||GroupPaused||!environmentReady;
-            readiness.Title=schedulePaused?"私信定时已暂停，请确认后启用":GroupPaused?"群聊定时已暂停，请确认后启用":environmentReady?"环境已准备好":"有组件待准备，点击检查";
+            bool safety=System.IO.File.Exists(System.IO.Path.Combine(BaseDir,".spark-safety-stop.json"));
+            readiness.Attention=safety||schedulePaused||GroupPaused||!environmentReady;
+            readiness.Title=safety?"验证 / 频繁提示已暂停发送，点击确认恢复":schedulePaused?"私信定时已暂停，请确认后启用":GroupPaused?"群聊定时已暂停，请确认后启用":environmentReady?"环境已准备好":"有组件待准备，点击检查";
             readiness.Detail=dataLocation!=null&&dataLocation.Fallback?"数据 · 本机用户目录":"数据 · 便携目录";
             readiness.AccessibleName=readiness.Title+"。"+readiness.Detail+(schedulePaused?"。打开定时设置":"。打开环境与数据检查");readiness.Invalidate();
         }

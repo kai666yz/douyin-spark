@@ -10,7 +10,7 @@ import shutil
 import sys
 import tempfile
 
-VERSION = '2.3.1'
+VERSION = '2.4.0'
 FIELDS = ['time', 'friend', 'url', 'message', 'status', 'note']
 
 def acquire_task_lock(path):
@@ -90,7 +90,7 @@ def resolve_data_dir(folder, local_root=None, writable=None):
                     copy(child,target/child.name)
             else:
                 shutil.copyfile(source,target)
-        for name in ('friends.json','config.json','following.json','sentences_pool.json','settings.json','conversations.json','conversation_candidates.json','group_task.json','logs','conversation_profile','browser_profile','browser_profile_edge','browser_profile_quark'):
+        for name in ('friends.json','config.json','following.json','sentences_pool.json','settings.json','conversations.json','conversation_candidates.json','group_task.json','.spark-safety-stop.json','logs','conversation_profile','browser_profile','browser_profile_edge','browser_profile_quark'):
             if (folder/name).exists():copy(folder/name,fallback/name)
         (fallback/'storage.ready').write_text(identity,encoding='utf-8')
         pending.unlink()

@@ -10,24 +10,33 @@ namespace DouyinSpark
     public class GroupTaskSettings
     {
         public string message {get;set;}
+        public string message_mode {get;set;}
+        public List<string> categories {get;set;}
+        public List<string> custom_messages {get;set;}
         public List<string> targets {get;set;}
         public string schedule {get;set;}
         public bool paused {get;set;}
         public string last_trigger_day {get;set;}
         public int interval_seconds {get;set;}
-        public GroupTaskSettings(){message="";targets=new List<string>();schedule="";paused=true;last_trigger_day="";interval_seconds=60;}
+        public GroupTaskSettings(){message="";targets=new List<string>();schedule="";paused=true;last_trigger_day="";interval_seconds=60;message_mode="random";categories=new List<string>{"废话文学"};custom_messages=new List<string>();}
         public static GroupTaskSettings Read(string root)
         {
             string path=Path.Combine(root,"group_task.json");if(!File.Exists(path))return new GroupTaskSettings();
-            var value=SparkStorage.Json().Deserialize<GroupTaskSettings>(SparkStorage.CleanJson(File.ReadAllText(path,Encoding.UTF8)));
-            if(value==null||value.targets==null)throw new InvalidDataException("群聊任务配置损坏，原文件已保留。");return value;
+            string text=SparkStorage.CleanJson(File.ReadAllText(path,Encoding.UTF8));var value=SparkStorage.Json().Deserialize<GroupTaskSettings>(text);
+            if(value!=null&&!SparkStorage.Json().Deserialize<Dictionary<string,object>>(text).ContainsKey("message_mode"))value.message_mode=string.IsNullOrWhiteSpace(value.message)?"random":"fixed";
+            if(value==null||value.targets==null)throw new InvalidDataException("群聊任务配置损坏，原文件已保留。");value.categories=value.categories??new List<string>();value.custom_messages=value.custom_messages??new List<string>();return value;
         }
         public void Save(string root)
         {
             if(interval_seconds<15||interval_seconds>600)throw new InvalidDataException("群间间隔须为15～600秒。");
             if(message==null||message.Length>2000)throw new InvalidDataException("群聊消息请控制在1～2000字以内。");
+            if(!new[]{"random","fixed","rotation"}.Contains(message_mode))throw new InvalidDataException("请选择消息模式。");
+            categories=categories??new List<string>();custom_messages=custom_messages??new List<string>();
+            if(message_mode=="random"&&categories.Count==0)throw new InvalidDataException("请至少选择一个群聊语录分类。");
+            if(message_mode=="rotation"&&!custom_messages.Any(x=>!string.IsNullOrWhiteSpace(x)))throw new InvalidDataException("请输入多条轮换语录，每行一条。");
+            if(custom_messages.Any(x=>x!=null&&x.Length>2000))throw new InvalidDataException("每条语录不超过2000字。");
             targets=(targets??new List<string>()).Distinct().ToList();
-            if(!paused&&(string.IsNullOrWhiteSpace(message)||targets.Count==0||SchedulePolicy.Next(DateTime.Now,schedule)==DateTime.MaxValue))throw new InvalidDataException("启用群聊定时前，请选择目标群、填写消息及HH:mm时间。");
+            if(!paused&&(message_mode=="fixed"&&string.IsNullOrWhiteSpace(message)||targets.Count==0||SchedulePolicy.Next(DateTime.Now,schedule)==DateTime.MaxValue))throw new InvalidDataException("启用群聊定时前，请选择目标群、填写消息及HH:mm时间。");
             SparkStorage.WriteJson(Path.Combine(root,"group_task.json"),this);
         }
         public static List<ConversationRecord> Resolve(IEnumerable<ConversationRecord> records,IEnumerable<string> ids)
@@ -44,6 +53,7 @@ namespace DouyinSpark
         public string time {get;set;}
         public string status {get;set;}
         public string note {get;set;}
+        public string message_hash {get;set;}
     }
     public static class GroupJournal
     {
@@ -75,7 +85,7 @@ namespace DouyinSpark
         {Directory.CreateDirectory(Folder(root));Write(root,new GroupAttempt{id=DateTime.Now.ToString("yyyyMMdd")+"_"+Guid.NewGuid().ToString("N"),group_id=group.id,name=group.name,time=DateTime.Now.ToString("s"),status="CANCELLED",note="用户停止，未开始处理"});}
         public static FileStream Acquire(string root)
         {
-            string path=Path.Combine(root,".spark-task.lock");var file=new FileStream(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.ReadWrite);
+            string path=Path.Combine(root,".spark-group-run.lock");var file=new FileStream(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.ReadWrite);
             try{if(file.Length==0){file.WriteByte(0);file.Flush();}file.Lock(0,1);return file;}catch{file.Dispose();throw new InvalidOperationException("已有发送或导入任务，请稍后重试。");}
         }
     }

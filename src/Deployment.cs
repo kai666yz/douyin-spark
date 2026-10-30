@@ -11,7 +11,7 @@ namespace DouyinSpark
     {
         public string Root,ProgramRoot,Notice="";
         public bool Fallback,Changed;
-        public static readonly string[] Files={"friends.json","config.json","following.json","sentences_pool.json","settings.json","conversations.json","conversation_candidates.json","group_task.json"};
+        public static readonly string[] Files={"friends.json","config.json","following.json","sentences_pool.json","settings.json","conversations.json","conversation_candidates.json","group_task.json",".spark-safety-stop.json"};
         public static readonly string[] Folders={"logs","conversation_profile","browser_profile","browser_profile_edge","browser_profile_quark"};
         public static string Normalize(string path){return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar).ToUpperInvariant();}
         public static string Hash(string text){using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text))).Replace("-","").ToLowerInvariant();}

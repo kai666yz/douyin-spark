@@ -1,0 +1,30 @@
+{
+  "targets": 25,
+  "baseline_commit": "e0b6cc8",
+  "results": [
+    {
+      "variant": "baseline",
+      "index": "total",
+      "time": "2026-10-30T12:49:36.788",
+      "seconds": 155.281,
+      "status": "25/25"
+    },
+    {
+      "variant": "optimized_round1",
+      "index": "total",
+      "time": "2026-10-30T12:50:11.713",
+      "seconds": 34.938,
+      "status": "25/25"
+    },
+    {
+      "variant": "optimized_round2",
+      "index": "total",
+      "time": "2026-10-30T12:50:46.618",
+      "seconds": 34.89,
+      "status": "25/25"
+    }
+  ],
+  "reduction_percent": 77.5,
+  "scope": "identical intercepted local pages; no real account/messages or platform verification assessment",
+  "requests_intercepted": 76
+}

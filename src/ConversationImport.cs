@@ -16,7 +16,8 @@ namespace DouyinSpark
         static string ConversationsPath {get{return Path.Combine(BaseDir,"conversations.json");}}
         static void StartConversationImport()
         {
-            if(!btnStart.Enabled || importingFollowing!=0||groupTaskOpen){MessageBox.Show(mainForm,"请先结束发送，并关闭群聊网页窗口后再导入会话。","导入会话");return;}
+            if(privateRunActive || importingFollowing!=0||groupTaskRunning){MessageBox.Show(mainForm,"请先结束发送，并关闭群聊网页窗口后再导入会话。","导入会话");return;}
+            if(groupWindow!=null){groupWindow.Close();ShowWorkspace("联系人");}
             importingFollowing=1;
             try{using(var dialog=new ConversationImportForm(BaseDir)){dialog.ShowDialog(mainForm);}LoadLogs();RefreshRoster();}
             catch(Exception ex){MessageBox.Show(mainForm,"会话导入未完成，原名单已保留。\n"+ex.Message,"导入会话");}
@@ -89,7 +90,7 @@ namespace DouyinSpark
                 if(web==null){
                     status.Text="正在打开内嵌消息页面；首次可能需要扫码，此后保留软件内登录。";
                     web=new WebView2 {Dock=DockStyle.Fill};split.Panel1.Controls.Add(web);
-                    var environment=await CoreWebView2Environment.CreateAsync(null,Path.Combine(root,"conversation_profile"));
+                    var environment=await BrowserSession.EnvironmentAsync(root);
                     await web.EnsureCoreWebView2Async(environment);
                     web.CoreWebView2.Settings.AreDevToolsEnabled=false;web.CoreWebView2.Settings.AreDefaultContextMenusEnabled=false;
                     web.CoreWebView2.Settings.IsStatusBarEnabled=false;web.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled=false;
@@ -207,7 +208,7 @@ namespace DouyinSpark
                 // Validate both existing stores before writing either one.
                 ConversationStore.Read(Path.Combine(root,"conversations.json"));SparkStorage.ReadFriends(Path.Combine(root,"friends.json"));
                 int count=ConversationStore.Merge(Path.Combine(root,"conversations.json"),selected);
-                var privateFriends=selected.Where(x=>x.CanSend).Select(x=>new FriendRecord {name=x.name,url=x.url}).ToList();
+                var privateFriends=selected.Where(x=>x.CanSendPrivate).Select(x=>new FriendRecord {name=x.name,url=x.url}).ToList();
                 if(privateFriends.Count>0)SparkStorage.AddFriends(Path.Combine(root,"friends.json"),privateFriends);
                 SparkStorage.AppendLog(Path.Combine(root,"logs","selection.log"),DateTime.Now.ToString("s")+" | conversation_selected="+selected.Count+" | added="+count+Environment.NewLine);
                 MessageBox.Show(this,"已加入 "+count+" 个新会话。\n群聊请在消息任务中独立设置；待补主页的私信暂不发送。导入本身不会发送消息。","导入完成");Close();

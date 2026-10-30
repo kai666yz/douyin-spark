@@ -15,7 +15,7 @@ namespace DouyinSpark
         static Label privateTaskInfo,groupTaskInfo;
         static void ShowWorkspace(string key)
         {
-            contactsWorkspace.Visible=key=="联系人";tasksWorkspace.Visible=key=="消息任务";settingsWorkspace.Visible=key=="设置";
+            contactsWorkspace.Visible=key=="联系人";tasksWorkspace.Visible=key=="消息任务";settingsWorkspace.Visible=key=="设置";if(groupWindow!=null)groupWindow.Visible=key=="群聊消息";
             foreach(var item in workspaceNavigation){item.Value.Selected=item.Key==key;item.Value.Invalidate();}
             if(key=="消息任务")RefreshTaskWorkspace();
         }
@@ -47,7 +47,7 @@ namespace DouyinSpark
                 PageAction("消息内容",delegate{ShowFixedMessage();RefreshTaskWorkspace();}),PageAction("分类语录",delegate{ShowSentenceManager();}),PageAction("每日定时",delegate{ShowScheduleDialog();RefreshTaskWorkspace();}),PageAction("预览消息",delegate{DoDry();}),taskStart,taskStop),0,1);
             page.Controls.Add(FeatureCard("群聊问候","",out groupTaskInfo,
                 PageAction("群聊消息与定时",delegate{OpenGroupTask();},true),PageAction("群聊发送记录",delegate{GroupHistoryForm.Open(mainForm,BaseDir);}),PageAction("导入目标群",delegate{ShowWorkspace("联系人");StartConversationImport();})),0,2);
-            var hint=ViewLabel("电脑休眠、软件退出或迁移暂停时，不追发错过的任务。同一时间的任务会排队处理。",9,false,true);hint.Dock=DockStyle.Top;hint.Height=48;page.Controls.Add(hint,0,3);RefreshTaskWorkspace();return page;
+            var hint=ViewLabel("电脑休眠、软件退出或迁移暂停时，不追发错过的任务。私信与群聊共用一个发送名额，按会话交替处理。",9,false,true);hint.Dock=DockStyle.Top;hint.Height=48;page.Controls.Add(hint,0,3);RefreshTaskWorkspace();return page;
         }
         static Control BuildSettingsWorkspace()
         {

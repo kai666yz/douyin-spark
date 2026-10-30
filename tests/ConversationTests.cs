@@ -6,7 +6,7 @@ class ConversationTests
   string root=Path.Combine(Path.GetTempPath(),"conversation-tests-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);string path=Path.Combine(root,"conversations.json");
   try {
    var group=ConversationRecord.Normalize(new ConversationRecord {name="同名",kind="group",conversation_id="group:123",url="https://www.douyin.com/user/wrong"});
-   Check(group.url==""&&!group.CanSend,"group must never be sendable");
+   Check(group.url==""&&group.CanSend&&!group.CanSendPrivate,"group sends only by ID, never through private profile path");
    var pending=ConversationRecord.Normalize(new ConversationRecord {name="待补",kind="private",conversation_id="peer:99"});Check(!pending.CanSend,"no profile must not send");
    var person=ConversationRecord.Normalize(new ConversationRecord {name="好友",kind="private",conversation_id="peer:1",url="https://www.douyin.com/user/qa"});
    Check(ConversationStore.Merge(path,new[]{group,pending,person})==3,"initial import");
