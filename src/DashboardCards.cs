@@ -10,14 +10,21 @@ namespace DouyinSpark
         public TodaySummary Summary=new TodaySummary();
         public string NextText="未设置定时", ModeText="分类语录";
         public RoundButton StartButton;
-        public RoundButton GroupButton;
+        public RoundButton GroupButton,StopButton;
+        public string StateText="准备就绪";public bool Busy;
         public bool GroupMode;
         public bool Compact;
         public OverviewCard(){DoubleBuffered=true;BackColor=AppPalette.Canvas;SetStyle(ControlStyles.ResizeRedraw,true);}
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            if(StartButton!=null) {if(Compact)StartButton.SetBounds(Width-170,49,150,48);else StartButton.SetBounds(Width-212,65,188,56);}
+            PlaceActions();
+        }
+        protected override void OnLayout(LayoutEventArgs e){base.OnLayout(e);PlaceActions();}
+        void PlaceActions()
+        {
+            if(StartButton!=null) {if(Compact)StartButton.SetBounds(Width-258,55,134,56);else StartButton.SetBounds(Width-308,65,176,56);}
+            if(StopButton!=null)StopButton.SetBounds(Width-118,55,100,56);
             if(GroupButton!=null&&StartButton!=null)GroupButton.Bounds=StartButton.Bounds;
         }
         protected override void OnPaint(PaintEventArgs e)
@@ -58,7 +65,8 @@ namespace DouyinSpark
                 g.DrawString(GroupMode?"今日已处理 · 任务目标群":"今日已处理 · 私信好友",small,muted,20,86);
                 string stats=(GroupMode?"已核对 ":"成功 ")+Summary.Succeeded+"   失败 "+Summary.Failed+"   待发 "+Summary.Pending+(Summary.Unconfirmed>0?"   待确认 "+Summary.Unconfirmed:"");
                 g.DrawString(stats,small,muted,20,117);
-                g.DrawString(GroupMode?"独立窗口 · 可切换查看":"仅发送可用私信",small,muted,new RectangleF(Width-170,101,150,22),new StringFormat {Alignment=StringAlignment.Center});
+                using(var dot=new SolidBrush(Busy?AppPalette.Accent:AppPalette.Success))g.FillEllipse(dot,Width-252,126,6,6);
+                g.DrawString(StateText,small,muted,new RectangleF(Width-239,120,220,22),new StringFormat {Alignment=StringAlignment.Far});
             }
         }
         static void Metric(Graphics g,string label,int value,int x,Color color)
@@ -73,9 +81,10 @@ namespace DouyinSpark
         protected override void OnPaint(PaintEventArgs e)
         {
             var g=e.Graphics;g.Clear(AppPalette.Surface);g.SmoothingMode=SmoothingMode.AntiAlias;
-            float top=Math.Max(6,Height/2f-24);
+            float top=Math.Max(6,Height/2f-14);
+            if(Height>145){KittyTheme.PaintKittyFace(g,Width/2f,top-39,48);}
             using(var font=AppPalette.Font(10,true))using(var brush=new SolidBrush(AppPalette.Muted))g.DrawString("暂无发送记录",font,brush,new RectangleF(0,top,Width,25),new StringFormat {Alignment=StringAlignment.Center});
-            if(Height>90)using(var font=AppPalette.Font(8))using(var brush=new SolidBrush(AppPalette.Muted))g.DrawString("在此查看所选联系人的发送结果",font,brush,new RectangleF(0,top+28,Width,22),new StringFormat {Alignment=StringAlignment.Center});
+            if(Height>90)using(var font=AppPalette.Font(8))using(var brush=new SolidBrush(AppPalette.Muted))g.DrawString("先核对消息，再点击上方开始发送",font,brush,new RectangleF(0,top+28,Width,22),new StringFormat {Alignment=StringAlignment.Center});
         }
     }
 }

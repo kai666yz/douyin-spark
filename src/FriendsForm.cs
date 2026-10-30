@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -111,22 +111,7 @@ namespace DouyinSpark
 
         static void ShowFollowingPick(List<string[]> items, HashSet<string> exist)
         {
-            var form=new ThemedForm {Text="勾选添加好友",Size=new Size(580,500),StartPosition=FormStartPosition.CenterParent};
-            var list=new CheckedListBox {Location=new Point(16,16),Size=new Size(530,370),CheckOnClick=true};
-            foreach(var item in items) list.Items.Add(item[0]);
-            var save=new Button {Text="导入选中",Location=new Point(400,405),Size=new Size(135,35)};
-            save.Click+=delegate
-            {
-                try
-                {
-                    var incoming=new List<FriendRecord>();
-                    foreach(int i in list.CheckedIndices) incoming.Add(new FriendRecord {name=items[i][0],url=items[i][1]});
-                    int count=SparkStorage.AddFriends(FriendsPath,incoming);
-                    MessageBox.Show("已添加 "+count+" 位新好友，重复主页已跳过。"); form.Close();
-                }
-                catch(Exception ex) { MessageBox.Show(ex.Message,"导入失败（原名单未覆盖）"); }
-            };
-            form.Controls.AddRange(new Control[]{list,save});form.ShowDialog(mainForm);
+            using(var form=new FollowingPickForm(BaseDir,items,exist))form.ShowDialog(mainForm);
         }
     }
 }

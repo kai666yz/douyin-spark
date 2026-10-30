@@ -7,6 +7,9 @@ class GroupTaskTests {
   bool rejected=false;try{GroupTaskSettings.Resolve(new[]{a,b,p},new[]{p.id});}catch(InvalidDataException){rejected=true;}Check(rejected,"private cannot enter group plan");
   rejected=false;try{GroupTaskSettings.Resolve(new[]{a},new[]{b.id});}catch(InvalidDataException){rejected=true;}Check(rejected,"removed target rejected");
   var plan=new GroupTaskSettings{message="群聊独立消息😀",targets=new List<string>{a.id,a.id},schedule="13:10",paused=false};plan.Save(root);var read=GroupTaskSettings.Read(root);Check(read.targets.Count==1&&read.message==plan.message&&!read.paused,"settings persist and dedup");
+  Check(read.interval_seconds==60,"groups default to slower 60-second spacing");
+  plan.interval_seconds=1;rejected=false;try{plan.Save(root);}catch(InvalidDataException){rejected=true;}Check(rejected,"too-fast group spacing rejected");plan.interval_seconds=30;plan.Save(root);Check(GroupTaskSettings.Read(root).interval_seconds==30,"independent group interval persists");
+  File.WriteAllText(Path.Combine(root,"group_task.json"),"{\"message\":\"legacy\",\"targets\":[],\"schedule\":\"\",\"paused\":true}");Check(GroupTaskSettings.Read(root).interval_seconds==60,"old config without optional interval remains readable");
   plan.schedule="invalid";rejected=false;try{plan.Save(root);}catch(InvalidDataException){rejected=true;}Check(rejected,"invalid enabled schedule rejected");
   plan.schedule="13:10";plan.paused=true;plan.Save(root);Check(GroupTaskSettings.Read(root).paused,"pause survives restart");
   DateTime day=new DateTime(2026,10,29,12,0,0);var attempt=GroupJournal.Begin(root,a,day);Check(attempt.status=="UNCONFIRMED"&&GroupJournal.Blocked(GroupJournal.Read(root,day),a.id,day),"attempt persisted before click");
@@ -19,6 +22,7 @@ class GroupTaskTests {
   rejected=false;try{GroupJournal.Write(root,new GroupAttempt{id="../escape",group_id=a.id});}catch(InvalidDataException){rejected=true;}Check(rejected,"journal path traversal rejected");
   using(var first=GroupJournal.Acquire(root)){rejected=false;try{using(var second=GroupJournal.Acquire(root)){};}catch(InvalidOperationException){rejected=true;}Check(rejected,"shared task lock prevents overlapping sends");}
   using(var released=GroupJournal.Acquire(root))Check(released!=null,"lock released after task");
+  GroupJournal.Cancel(root,b);var cancelled=GroupSummary.Build(new[]{b.id},GroupJournal.Read(root,DateTime.Now),DateTime.Now);Check(cancelled.Failed==0&&cancelled.Pending==1,"cancelled groups remain pending, not failed");
   Console.WriteLine("PASS: "+count+" group-plan, journal, duplicate prevention, exact identity, pause and lock assertions; no browser/messages.");
  }
 }

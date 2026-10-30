@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -62,8 +62,8 @@ namespace DouyinSpark
     class RoundButton : Button
     {
         public Color MainColor=AppPalette.Accent, HoverColor=AppPalette.AccentDeep;
-        public bool Primary=true, Navigation=false, Selected=false;
-        public int CornerRadius=16;
+        public bool Primary=true, Navigation=false, Selected=false, Danger=false;
+        public int CornerRadius=12;
         public string IconName="";
         bool hover,pressed;
         public RoundButton()
@@ -81,7 +81,7 @@ namespace DouyinSpark
             g.Clear(parentColor);
             int shift=pressed?1:0;
             var box=new RectangleF(1,1+shift,Width-3,Height-5);
-            Color fill=Primary?(Enabled?(hover?AppPalette.AccentDeep:AppPalette.Accent):AppPalette.Soft):Selected||hover?AppPalette.Soft:parentColor;
+            Color fill=Primary?(Enabled?(Danger?AppPalette.Error:hover?AppPalette.AccentDeep:AppPalette.Accent):AppPalette.Soft):Selected||hover?AppPalette.Soft:parentColor;
             Color foreground=Primary&&Enabled?(AppPalette.Dark?AppPalette.Canvas:Color.White):Selected?AppPalette.AccentDeep:Enabled?AppPalette.Text:AppPalette.Muted;
             if(Primary&&Enabled)
             {
@@ -89,7 +89,7 @@ namespace DouyinSpark
                 using(var brush=new SolidBrush(Color.FromArgb(20,80,40,57)))g.FillPath(brush,path);
             }
             using(var path=AppPalette.Round(box,CornerRadius))
-            using(var brush=new SolidBrush(fill))g.FillPath(brush,path);
+            using(var brush=new LinearGradientBrush(box,fill,Primary&&Enabled&&!Danger?AppPalette.AccentDeep:fill,90f))g.FillPath(brush,path);
             bool icon=IconName.Length>0;
             if(icon)
             {

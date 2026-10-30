@@ -31,6 +31,7 @@ namespace DouyinSpark
         readonly SplitContainer split;
         readonly DataGridView grid;
         readonly Label status;
+        readonly Label selectionCount;
         readonly RoundButton read,login;
         WebView2 web;
         bool initializing,busy;
@@ -38,8 +39,8 @@ namespace DouyinSpark
         {
             root=dataRoot;Text="从私信导入好友与群聊";StartPosition=FormStartPosition.CenterParent;
             MinimumSize=new Size(1000,660);Size=new Size(Math.Min(1320,Screen.PrimaryScreen.WorkingArea.Width-40),Math.Min(840,Screen.PrimaryScreen.WorkingArea.Height-40));
-            var layout=new TableLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(20),ColumnCount=1,RowCount=4};
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute,72));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,46));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,64));
+            var layout=new TableLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(20),ColumnCount=1,RowCount=5};
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute,72));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,46));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,44));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,64));
             var header=new Panel {Dock=DockStyle.Fill};
             var title=new Label {Text="选择你想保持联系的人",Font=AppPalette.Font(17,true),AutoSize=true,Location=new Point(0,0)};
             var subtitle=new Label {Text="复用软件内登录；只读取会话名称与标识。群聊导入后，可在消息任务中独立设置。",Font=AppPalette.Font(9),AutoSize=true,Location=new Point(1,38),Tag="muted"};
@@ -61,10 +62,14 @@ namespace DouyinSpark
             grid.CurrentCellDirtyStateChanged+=delegate{if(grid.IsCurrentCellDirty)grid.CommitEdit(DataGridViewDataErrorContexts.Commit);};
             grid.CellValueChanged+=delegate(object s,DataGridViewCellEventArgs e){if(e.RowIndex>=0&&grid.Columns[e.ColumnIndex].Name=="pick")UpdateSelectionCount();};
             grid.DataError+=delegate(object s,DataGridViewDataErrorEventArgs e){e.ThrowException=false;};
-            split.Panel2.Controls.Add(grid);layout.Controls.Add(split,0,2);
-            var bottom=new Panel {Dock=DockStyle.Fill};status=new Label {Text="没有缓存时，请点“登录 / 刷新”，在软件内打开消息列表，再读取会话。",Location=new Point(0,12),Size=new Size(650,45),Font=AppPalette.Font(9),Tag="muted"};
+            selectionCount=new Label{Dock=DockStyle.Top,Height=25,Font=AppPalette.Font(9,true)};
+            var sent=ContactSelection.SentToday(root);
+            var groupSent=new HashSet<string>(GroupJournal.Read(root,DateTime.Now).Where(x=>new[]{"SUBMITTED","CONFIRMED","UNCONFIRMED","OK"}.Contains(x.status)).Select(x=>x.group_id));
+            layout.Controls.Add(ContactSelection.Toolbar(grid,UpdateSelectionCount,row=>{var item=candidates[Convert.ToString(row.Tag)];return Convert.ToString(row.Cells["kind"].Value)=="群聊"?!groupSent.Contains(item.id):ContactSelection.Unsent(Convert.ToString(row.Cells["url"].Value),sent);}),0,2);
+            split.Panel2.Controls.Add(grid);split.Panel2.Controls.Add(selectionCount);layout.Controls.Add(split,0,3);
+            var bottom=new Panel {Dock=DockStyle.Fill};selectionCount.Dock=DockStyle.None;selectionCount.SetBounds(0,0,780,24);bottom.Controls.Add(selectionCount);status=new Label {Text="没有缓存时，请点“登录 / 刷新”，在软件内打开消息列表，再读取会话。",Location=new Point(0,28),Size=new Size(760,30),Font=AppPalette.Font(9),Tag="muted"};
             var save=new RoundButton {Text="导入选中",Size=new Size(128,40),Dock=DockStyle.Right,Margin=new Padding(0,12,0,0)};
-            save.Click+=delegate{SaveSelection();};bottom.Controls.Add(status);bottom.Controls.Add(save);layout.Controls.Add(bottom,0,3);Controls.Add(layout);
+            save.Click+=delegate{SaveSelection();};bottom.Controls.Add(status);bottom.Controls.Add(save);layout.Controls.Add(bottom,0,4);Controls.Add(layout);KeyPreview=true;KeyDown+=delegate(object sender,KeyEventArgs e){if(e.Control&&e.KeyCode==Keys.A&&!(grid.EditingControl is TextBoxBase)&&!(ActiveControl is TextBoxBase)&&!(web!=null&&web.ContainsFocus)){foreach(DataGridViewRow row in grid.Rows)row.Cells["pick"].Value=true;UpdateSelectionCount();e.Handled=true;e.SuppressKeyPress=true;}};UpdateSelectionCount();
             try{
                 string path=Path.Combine(root,"conversation_candidates.json");
                 if(File.Exists(path))foreach(var item in ConversationStore.Read(path))Merge(item);
@@ -174,8 +179,8 @@ namespace DouyinSpark
         }
         void UpdateSelectionCount()
         {
-            if(status==null)return;int count=grid.Rows.Cast<DataGridViewRow>().Count(row=>Convert.ToBoolean(row.Cells["pick"].Value??false));
-            status.Text="已选择 "+count+" 个会话；确认后点右下角“导入选中”。";
+            if(selectionCount==null)return;int count=grid.Rows.Cast<DataGridViewRow>().Count(row=>Convert.ToBoolean(row.Cells["pick"].Value??false));
+            selectionCount.Text="已选 "+count+" / "+grid.Rows.Count+" 个会话 · 点击名称整行选择 · Ctrl+A全选";
         }
         void RebuildGrid()
         {
@@ -184,7 +189,7 @@ namespace DouyinSpark
                 object[] old;bool found=edits.TryGetValue(item.id,out old);
                 int i=grid.Rows.Add(found?old[0]:false,found?old[1]:item.kind=="group"?"群聊":item.kind=="private"?"私信":"待确认",item.name,found?old[2]:item.url);grid.Rows[i].Tag=item.id;
             }
-            AppPalette.StyleGrid(grid);
+            AppPalette.StyleGrid(grid);UpdateSelectionCount();
         }
         void SaveSelection()
         {
@@ -204,6 +209,7 @@ namespace DouyinSpark
                 int count=ConversationStore.Merge(Path.Combine(root,"conversations.json"),selected);
                 var privateFriends=selected.Where(x=>x.CanSend).Select(x=>new FriendRecord {name=x.name,url=x.url}).ToList();
                 if(privateFriends.Count>0)SparkStorage.AddFriends(Path.Combine(root,"friends.json"),privateFriends);
+                SparkStorage.AppendLog(Path.Combine(root,"logs","selection.log"),DateTime.Now.ToString("s")+" | conversation_selected="+selected.Count+" | added="+count+Environment.NewLine);
                 MessageBox.Show(this,"已加入 "+count+" 个新会话。\n群聊请在消息任务中独立设置；待补主页的私信暂不发送。导入本身不会发送消息。","导入完成");Close();
             }catch(Exception ex){MessageBox.Show(this,ex.Message,"未完成导入");}
         }

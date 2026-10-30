@@ -14,7 +14,8 @@ namespace DouyinSpark
         public string schedule {get;set;}
         public bool paused {get;set;}
         public string last_trigger_day {get;set;}
-        public GroupTaskSettings(){message="";targets=new List<string>();schedule="";paused=true;last_trigger_day="";}
+        public int interval_seconds {get;set;}
+        public GroupTaskSettings(){message="";targets=new List<string>();schedule="";paused=true;last_trigger_day="";interval_seconds=60;}
         public static GroupTaskSettings Read(string root)
         {
             string path=Path.Combine(root,"group_task.json");if(!File.Exists(path))return new GroupTaskSettings();
@@ -23,6 +24,7 @@ namespace DouyinSpark
         }
         public void Save(string root)
         {
+            if(interval_seconds<15||interval_seconds>600)throw new InvalidDataException("群间间隔须为15～600秒。");
             if(message==null||message.Length>2000)throw new InvalidDataException("群聊消息请控制在1～2000字以内。");
             targets=(targets??new List<string>()).Distinct().ToList();
             if(!paused&&(string.IsNullOrWhiteSpace(message)||targets.Count==0||SchedulePolicy.Next(DateTime.Now,schedule)==DateTime.MaxValue))throw new InvalidDataException("启用群聊定时前，请选择目标群、填写消息及HH:mm时间。");
@@ -69,6 +71,8 @@ namespace DouyinSpark
         {
             Directory.CreateDirectory(Folder(root));Write(root,new GroupAttempt{id=DateTime.Now.ToString("yyyyMMdd")+"_"+Guid.NewGuid().ToString("N"),group_id=group.id,name=group.name,time=DateTime.Now.ToString("s"),status="FAILED",note=note});
         }
+        public static void Cancel(string root,ConversationRecord group)
+        {Directory.CreateDirectory(Folder(root));Write(root,new GroupAttempt{id=DateTime.Now.ToString("yyyyMMdd")+"_"+Guid.NewGuid().ToString("N"),group_id=group.id,name=group.name,time=DateTime.Now.ToString("s"),status="CANCELLED",note="用户停止，未开始处理"});}
         public static FileStream Acquire(string root)
         {
             string path=Path.Combine(root,".spark-task.lock");var file=new FileStream(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.ReadWrite);

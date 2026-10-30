@@ -23,16 +23,28 @@ namespace DouyinSpark
         static bool ConfigBool(string key){return string.Equals(ConfigString(key),"true",StringComparison.OrdinalIgnoreCase);}
         static void PrepareStorageWithProgress()
         {
-            Exception failure=null;
-            using(var dialog=new ThemedForm{Text="抖音续火花 · 启动准备",Size=new Size(510,205),FormBorderStyle=FormBorderStyle.FixedDialog,ControlBox=false,StartPosition=FormStartPosition.CenterScreen}){
-                dialog.Controls.Add(new Label{Text="正在准备你的工作空间",Font=AppPalette.Font(15,true),AutoSize=true,Location=new Point(24,22)});
-                dialog.Controls.Add(new Label{Text="正在检查数据位置并保留已有文件，请稍候。",Font=AppPalette.Font(9),AutoSize=true,Location=new Point(26,66),Tag="muted"});
-                dialog.Controls.Add(new ProgressBar{Style=ProgressBarStyle.Marquee,Location=new Point(26,108),Size=new Size(440,12)});
-                dialog.Shown+=async delegate{try{await Task.Run((Action)PrepareStorage);}catch(Exception ex){failure=ex;}finally{dialog.Close();}};
-                dialog.ShowDialog();
-            }
-            if(failure!=null)throw new IOException(failure.Message,failure);
+            bool retry;
+            do{
+                retry=false;Exception failure=null;
+                using(var dialog=new StartupProgressForm()){
+                    dialog.Shown+=async delegate{
+                        try{
+                            dialog.Stage(0,"正在检查数据保存位置；已有文件会保留。无需单独安装 Python。");
+                            await Task.Run((Action)PrepareStorage);StartupEvent("storage_ready");
+                            dialog.Stage(1,"正在启动并校验内置后端，不会访问抖音或发送消息。首次加载可能稍慢。");
+                            string backend=await Task.Run((Func<string>)ValidateBackend);StartupEvent(backend);
+                            dialog.Stage(2,"运行环境就绪，正在检查 WebView2 和发送浏览器；已安装的组件会跳过。");
+                            string runtime=await Task.Run((Func<string>)RuntimeVersion);string browser=BrowserPath(GetBrowserChoice());
+                            StartupEvent("components | webview2="+(runtime.Length>0?"ready":"missing")+" | browser="+(browser.Length>0?"ready":"missing"));
+                            dialog.Stage(3,runtime.Length>0&&browser.Length>0?"准备完成，正在进入软件。":"基础环境准备完成；接下来会显示缺失组件与处理按钮。");
+                            dialog.Stage(4,"环境检查完成。缺失组件可在下一页一键处理；不会自动发送消息。");await Task.Delay(250);dialog.Close();
+                        }catch(Exception ex){failure=ex;try{StartupEvent("failed | "+ex.Message);}catch{}dialog.Fail(ex);}
+                    };
+                    dialog.ShowDialog();if(failure!=null){retry=dialog.DialogResult==DialogResult.Retry;if(!retry)throw new IOException(failure.Message,failure);}
+                }
+            }while(retry);
         }
+
         static void PrepareStorage()
         {
             dataLocation=DataLocation.Resolve(ProgramDir,Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"douyin-spark"));
@@ -88,7 +100,7 @@ namespace DouyinSpark
             if(now>=nextScheduled){bool due=SchedulePolicy.Due(now,nextScheduled,schedulePaused,scheduleLastTrigger);nextScheduled=SchedulePolicy.Next(now,scheduleTime);if(due)privateQueueUntil=now.AddMinutes(10);else Log("已跳过错过的定时，等待下一次计划时间。");}
             if(privateQueueUntil==DateTime.MinValue)return;
             if(now>privateQueueUntil){privateQueueUntil=DateTime.MinValue;Log("私信定时排队超过10分钟，本次跳过。");return;}
-            if(!btnStart.Enabled||importingFollowing!=0||groupTaskRunning)return;
+            if(!btnStart.Enabled||SendCooling||importingFollowing!=0||groupTaskRunning)return;
             privateQueueUntil=DateTime.MinValue;
             if(BrowserPath(GetBrowserChoice()).Length==0){Log("定时未发送：发送浏览器不可用，请打开环境与数据检查。");return;}
             // Persist before dispatch so a restart cannot repeat today's attempt.
@@ -111,7 +123,7 @@ namespace DouyinSpark
             var head=new Panel{Dock=DockStyle.Fill,Tag="canvas"};head.Controls.Add(new Label{Text="先准备好，再安心开始",Font=AppPalette.Font(20,true),AutoSize=true,Location=new Point(0,0)});head.Controls.Add(new Label{Text="后端已随软件提供；缺少的组件在这里处理，无需自己找安装教程。",Font=AppPalette.Font(9),AutoSize=true,Location=new Point(2,46),Tag="muted"});layout.Controls.Add(head,0,0);
             storageInfo=new Label{AutoEllipsis=true,Font=AppPalette.Font(9),Location=new Point(18,42),Size=new Size(500,54),Tag="muted"};
             var data=Card("01   数据保存",storageInfo);var open=new RoundButton{Text="打开文件夹",Primary=false,Location=new Point(548,16),Size=new Size(128,36)};open.Click+=delegate{Process.Start("explorer.exe",Program.QuoteArg(root));};data.Controls.Add(open);layout.Controls.Add(data,0,1);
-            runtimeInfo=new Label{Font=AppPalette.Font(9),Location=new Point(18,44),Size=new Size(500,42),Tag="muted"};var web=Card("02   内嵌网页",runtimeInfo);install=new RoundButton{Text="一键准备",Location=new Point(548,16),Size=new Size(128,36)};install.Click+=async delegate{if(installing)return;installing=true;ControlBox=false;install.Enabled=false;progress.Visible=true;progress.Style=ProgressBarStyle.Marquee;footer.Text="正在调用微软安装器联网准备 WebView2，请保持网络连接…";try{await RuntimeInstaller.InstallAsync(programRoot);footer.Text=runtime().Length>0?"网页组件已准备好，可继续使用。":"安装器已结束，暂未检测到 Runtime。可重新检查或打开微软官方下载页。";}catch(Exception ex){footer.Text="准备未完成："+ex.Message;}finally{installing=false;ControlBox=true;progress.Visible=false;RefreshChecks();}};web.Controls.Add(install);layout.Controls.Add(web,0,2);
+            runtimeInfo=new Label{Font=AppPalette.Font(9),Location=new Point(18,44),Size=new Size(500,42),Tag="muted"};var web=Card("02   内嵌网页",runtimeInfo);install=new RoundButton{Text="一键准备",Location=new Point(548,16),Size=new Size(128,36)};install.Click+=async delegate{if(installing)return;installing=true;ControlBox=false;install.Enabled=false;progress.Visible=true;progress.Style=ProgressBarStyle.Marquee;progress.Style=ProgressBarStyle.Marquee;footer.Text="阶段2/3 · 正在联网安装 WebView2；耗时取决于网络，不会静默处理。";try{Program.StartupEvent("webview2_install_requested");await RuntimeInstaller.InstallAsync(programRoot);Program.StartupEvent("webview2_installer_completed");footer.Text=runtime().Length>0?"网页组件已准备好，可继续使用。":"安装器已结束，暂未检测到 Runtime。可重新检查或打开微软官方下载页。";}catch(Exception ex){Program.StartupEvent("webview2_install_failed | "+ex.Message);footer.Text="准备未完成："+ex.Message;MessageBox.Show(this,ex.Message+"\n请检查网络后重试，或点击微软下载页。","组件准备未完成",MessageBoxButtons.OK,MessageBoxIcon.Warning);}finally{installing=false;ControlBox=true;progress.Visible=false;RefreshChecks();}};web.Controls.Add(install);layout.Controls.Add(web,0,2);
             browserInfo=new Label{Font=AppPalette.Font(9),Location=new Point(18,72),Size=new Size(655,24),Tag="muted"};var send=Card("03   发送浏览器",browserInfo);browsers=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Font=AppPalette.Font(9),Location=new Point(18,38),Size=new Size(322,30)};browsers.Items.AddRange(new object[]{"Microsoft Edge","Google Chrome","夸克浏览器"});browsers.SelectedIndex=choice=="msedge"?0:choice=="chrome"?1:2;
             var choose=new RoundButton{Text="使用所选",Primary=false,Location=new Point(548,30),Size=new Size(128,36)};choose.Click+=delegate{string key=SelectedBrowser();if(browserPath(key).Length==0){footer.Text="没有找到所选浏览器。请改选已安装的浏览器；可先进入软件管理联系人。";return;}saveBrowser(key);footer.Text="已保存发送浏览器。首次发送前，请完成该浏览器内的软件专用登录。";RefreshChecks();};send.Controls.AddRange(new Control[]{browsers,choose});layout.Controls.Add(send,0,3);
             footer=new Label{Dock=DockStyle.Fill,Font=AppPalette.Font(9),Tag="muted",Padding=new Padding(2,10,2,0),Text=paused?"检测到首次确认或迁移，已有定时已暂停。进入软件后，在定时设置中确认启用；不会立即补发。":"登录状态由你在软件内确认。即使暂缺组件，也可先管理名单和查看历史。"};layout.Controls.Add(footer,0,4);

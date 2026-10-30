@@ -292,6 +292,7 @@ def main():
     ap.add_argument("--no-sleep", action="store_true", help="不等待")
     ap.add_argument("--friends-file", type=Path, default=FRIENDS_FILE, help="本次选中的好友名单")
     ap.add_argument("--cancel-file", type=Path, help="存在时停止后续发送")
+    ap.add_argument("--stop-after-current", type=Path, help="当前联系人处理完后停止，剩余联系人记录为已取消")
     args = ap.parse_args()
     if args.message is not None and not args.message.strip():
         ap.error("--message 不能是空白文本")
@@ -394,6 +395,8 @@ def main():
                 print("\n今天已全部发送完成，无需重复发送。")
                 return
 
+    if not args.dry_run:
+        print(f"TASK|PLANNED|{len(friends)}", flush=True)
     msgs = [args.message] * len(friends) if args.message is not None else pick_sentences(n=len(friends))
     if len(msgs) < len(friends):
         print(f"警告：句子池只剩 {len(msgs)} 句，不够 {len(friends)} 人")
@@ -464,7 +467,7 @@ def main():
             ctx.close()
         return
 
-    # ---------- 正式发送：async 并发 3 路 ----------
+    # ---------- 正式发送：逐位处理，支持当前联系人结束后停止 ----------
     import asyncio
     from playwright.async_api import async_playwright
 
@@ -613,6 +616,9 @@ def main():
         except Exception as e:
             return ("UNCONFIRMED" if submitted else "ERROR", str(e)[:120])
 
+    def soft_stopped():
+        return bool(args.stop_after_current and args.stop_after_current.exists())
+
     async def worker(ctx, group, cancel_file=None, delay=0):
         if delay > 0:
             await asyncio.sleep(delay)
@@ -620,7 +626,7 @@ def main():
         page.set_default_timeout(15000)
         out = []
         for f, m in group:
-            if halted[0]:
+            if halted[0] or soft_stopped():
                 break
             if cancel_file and Path(cancel_file).exists():
                 break
@@ -641,6 +647,7 @@ def main():
                     status, note = ("ERROR", str(e2)[:80])
             out.append((f, m, status, note))
             append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", f['name'], f['url'], m, status, note]])
+            print(f"RESULT|{f['url']}|{status}", flush=True)
             flag = "✓" if status == "OK" else "✗"
             print(f"  {flag} {f['name']:<16} [{status}] {note}", flush=True)
             done_count[0] += 1
@@ -670,10 +677,12 @@ def main():
         for f, m, old_status, old_note in failed:
             status, note = old_status, old_note
             for attempt in range(2):
-                if halted[0] or (cancel_file and Path(cancel_file).exists()):
+                if halted[0] or soft_stopped() or (cancel_file and Path(cancel_file).exists()):
                     break
                 print(f"[重试 {attempt+1}/2] 等待 {2**(attempt+1)} 秒：{f['name']}", flush=True)
                 await asyncio.sleep(2**(attempt+1))
+                if soft_stopped():
+                    break
                 page = await ctx.new_page()
                 page.set_default_timeout(15000)
                 try:
@@ -681,6 +690,7 @@ def main():
                 finally:
                     await page.close()
                 append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", f['name'], f['url'], m, status, note]])
+                print(f"RESULT|{f['url']}|{status}", flush=True)
                 if status not in ('ERROR','NO_BTN','NO_INPUT'):
                     break
             out.append((f,m,status,note))
@@ -706,6 +716,8 @@ def main():
                 print("\n*** 需要登录：已把 Chrome 窗口移到屏幕中央，请扫码登录，程序会自动继续 ***", flush=True)
                 show_chrome_window(tg["title"])
                 for _ in range(180):
+                    if soft_stopped() or (args.cancel_file and args.cancel_file.exists()):
+                        break
                     if "login" not in login_page.url and "passport" not in login_page.url:
                         break
                     await login_page.wait_for_timeout(1000)
@@ -713,7 +725,7 @@ def main():
             await login_page.close()
             # 窗口已通过 --window-position 置于屏幕外，全程不抢前台
 
-            # 分 3 组并发，错峰启动
+            # 保持单路处理；停止请求只在联系人边界生效
             groups = [[] for _ in range(CONCURRENCY)]
             for i, (f, m) in enumerate(zip(friends, msgs)):
                 groups[i % CONCURRENCY].append((f, m))
@@ -727,7 +739,7 @@ def main():
                 for ch in results for f, m, s, n in ch
                 if s in ("ERROR", "NO_BTN", "NO_INPUT")
             ]
-            if failed and not halted[0]:
+            if failed and not halted[0] and not soft_stopped():
                 print(f"\n第一轮完成，{len(failed)} 人未成功，开始补发...", flush=True)
                 retried = await retry_failed(ctx, failed, args.cancel_file)
                 flat = [item for ch in results for item in ch]
@@ -735,24 +747,33 @@ def main():
                 flat = [retry_map.get(item[0]["url"].rstrip("/"), item) for item in flat]
                 results = [flat]
 
+            if soft_stopped():
+                completed = {f["url"].rstrip("/") for chunk in results for f, _, _, _ in chunk}
+                cancelled = [(f, m, "CANCELLED", "用户停止，未开始处理") for f, m in zip(friends, msgs) if f["url"].rstrip("/") not in completed]
+                for f, m, state, note in cancelled:
+                    append_log([[f"{datetime.now():%Y-%m-%d %H:%M:%S}", f["name"], f["url"], m, state, note]])
+                results.append(cancelled)
+                print(f"TASK|CANCELLED|{len(cancelled)}", flush=True)
             await ctx.close()
             return results
 
     results = asyncio.run(run())
     rows = []
-    ok, fail = 0, 0
+    ok, fail, cancelled = 0, 0, 0
     for chunk in results:
         for f, m, status, note in chunk:
             ts = f"{datetime.now():%Y-%m-%d %H:%M:%S}"
             rows.append([ts, f["name"], f["url"], m, status, note])
             if status == "OK":
                 ok += 1
+            elif status == "CANCELLED":
+                cancelled += 1
             else:
                 fail += 1
     write_daily_report(rows)
 
     print("\n" + "=" * 50)
-    print(f"完成：成功 {ok}，失败 {fail}")
+    print(f"完成：成功 {ok}，失败 {fail}，已取消 {cancelled}")
     print(f"日志：{LOG_FILE}")
 
 if __name__ == "__main__":

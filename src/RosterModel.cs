@@ -8,7 +8,7 @@ namespace DouyinSpark
     {
         public string Key,Name,Kind,Url,Status,ConversationId;
         public bool Sendable;
-        public string Subtitle {get{return Kind=="group"?"群聊 · 独立消息任务":!Sendable?"私信 · 待补主页":Status=="OK"?"私信 · 今日已发送":Status=="UNCONFIRMED"?"私信 · 发送待确认":Status==""?"私信 · 今日待发送":"私信 · 请检查发送结果";}}
+        public string Subtitle {get{return Kind=="group"?"群聊 · 独立消息任务":!Sendable?"私信 · 待补主页":Status=="OK"?"私信 · 今日已发送":Status=="UNCONFIRMED"?"私信 · 发送待确认":Status=="CANCELLED"||Status=="STOPPED"?"私信 · 本轮已取消":Status==""?"私信 · 今日待发送":"私信 · 请检查发送结果";}}
     }
     public static class RosterModel
     {

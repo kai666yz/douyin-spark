@@ -23,8 +23,8 @@ namespace DouyinSpark
             groupTaskOpen=true;
             try{
                 groupWindow=new GroupTaskForm(BaseDir,ProgramDir,scheduled,initialId);
-                groupWindow.ReadyForRun=delegate{return btnStart.Enabled&&importingFollowing==0&&!groupTaskRunning;};
-                groupWindow.RunningChanged=delegate(bool value){groupTaskRunning=value;if(btnGroup!=null)btnGroup.Text=value?"查看群聊进度":"群聊消息任务";RefreshDashboard();if(!value&&exiting&&mainForm!=null)mainForm.BeginInvoke((Action)delegate{mainForm.Close();});};
+                groupWindow.ReadyForRun=delegate{return btnStart.Enabled&&!SendCooling&&importingFollowing==0&&!groupTaskRunning;};
+                groupWindow.RunningChanged=delegate(bool value){groupTaskRunning=value;if(!value&&groupWindow!=null&&groupWindow.RestartAfter>DateTime.UtcNow)sendCooldown=groupWindow.RestartAfter;RefreshSendButtons();if(btnGroup!=null)btnGroup.Text=value?"查看群聊进度":"群聊消息任务";RefreshDashboard();if(!value&&exiting&&mainForm!=null)mainForm.BeginInvoke((Action)delegate{mainForm.Close();});};
                 groupWindow.SettingsSaved=delegate{ReloadGroupTask();RefreshTaskWorkspace();RefreshDashboard();};
                 groupWindow.FormClosed+=delegate{groupWindow=null;groupTaskOpen=false;groupTaskRunning=false;try{ReloadGroupTask(false);RefreshEnvironmentBanner();RefreshTaskWorkspace();ShowRosterDetail();}catch(Exception ex){Log("群聊设置无法读取："+ex.Message);}};
                 groupWindow.Show();
@@ -41,7 +41,7 @@ namespace DouyinSpark
             }
             if(groupQueueUntil==DateTime.MinValue)return;
             if(now>groupQueueUntil){groupQueueUntil=DateTime.MinValue;Log("群聊定时等待超过10分钟，本次跳过。");return;}
-            if(!btnStart.Enabled||importingFollowing!=0||groupTaskOpen||groupTaskRunning)return;
+            if(!btnStart.Enabled||SendCooling||importingFollowing!=0||groupTaskOpen||groupTaskRunning)return;
             groupQueueUntil=DateTime.MinValue;
             try{
                 GroupTaskSettings.Resolve(ConversationStore.Read(ConversationsPath),groupPlan.targets);

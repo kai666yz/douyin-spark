@@ -33,7 +33,7 @@ def main():
         shutil.copy2(bootstrapper,stage/'runtime'/bootstrapper.name)
         if (ROOT/'docs').is_dir():
             (stage/'docs').mkdir()
-            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png','ui-tasks.png','ui-settings.png','ui-group-task.png','spark-icon.png'):
+            for name in ('ui-light.png','ui-dark.png','ui-groups.png','import-fixture.png','environment.png','ui-tasks.png','ui-settings.png','ui-group-task.png','spark-icon.png','startup-stages.png','selection-following.png','selection-conversations.png'):
                 if (ROOT/'docs'/name).is_file():shutil.copy2(ROOT/'docs'/name,stage/'docs'/name)
         pool=json.loads((ROOT/'sentences_pool.json').read_text('utf-8-sig'))
         # Never publish local custom messages or a personal category selection.
@@ -67,7 +67,7 @@ def main():
 需要 Windows 10/11、.NET Framework 4.6.2+（推荐4.8），以及已安装的 Edge/Chrome/夸克之一。
 
 导入会话在软件内完成，内嵌网页需要 Microsoft Edge WebView2 Runtime。首次可能需要扫码，后续保留登录。
-首次启动展示环境检查；缺少 WebView2 时点“一键准备”，由包内微软安装器联网安装，无需手动下载。
+启动展示四阶段检查进度与后台运行环境校验，失败可重试并查看startup.log；缺少 WebView2 时点“一键准备”，由包内微软安装器联网安装，无需手动下载。
 程序目录不可写时自动迁移到本机用户目录；环境与数据中可查看位置。原文件保留。
 首次升级确认、移动目录或切换账户时，已有定时暂停；明确保存启用后只等下一次，不立即补发。
 本软件当前未签名。请核对 GitHub 官方来源及 SHA256；不信任来源时不要绕过系统拦截。
@@ -75,6 +75,9 @@ def main():
 可直接选择上次读取的会话；新会话点登录/刷新，在软件内打开消息后读取。
 群聊可在消息任务中独立选择、填写消息及启用定时；不会混入私信发送。
 今日私信和今日群聊可切换查看，群聊采用独立窗口。任务可同时启用，执行时顺序排队。
+首页与消息任务页可停止发送：私信当前联系人结束后停止，剩余标已取消；停止后冷却10秒。
+选择窗口支持整行勾选、全选/全不选、今日未发送筛选、Ctrl+A与实时已选数。
+群间间隔可调15～600秒，默认60秒；群聊独立消息与每日定时。
 群聊网页提交仅记为待核对，不等于送达；结果不确定不自动重发，已有草稿保留。
 本包的好友名单为空，不含任何登录状态。旧版关注导入及手动添加入口保留。
 读取时可取消；失败、空结果和部分结果不覆盖关注缓存，更不会覆盖原好友名单。

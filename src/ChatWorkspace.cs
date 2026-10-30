@@ -19,7 +19,7 @@ namespace DouyinSpark
         {
             AppPalette.Dark=ConfigString("theme")=="dark";
             var form=new CardForm {Text="抖音续火花",Font=AppPalette.Font(),StartPosition=FormStartPosition.CenterScreen,MinimumSize=new Size(1120,740)};
-            form.FormClosing+=delegate(object sender,FormClosingEventArgs e){if(exiting&&groupTaskRunning&&groupWindow!=null){e.Cancel=true;groupWindow.RequestStopAndClose();}else if(exiting&&groupWindow!=null)groupWindow.Close();};
+            form.FormClosing+=delegate(object sender,FormClosingEventArgs e){if(exiting&&groupTaskRunning&&groupWindow!=null){e.Cancel=true;groupWindow.RequestStopAndClose();}else if(exiting&&groupWindow!=null)groupWindow.Close();if(exiting&&privateRunActive){e.Cancel=true;RequestStopSending();if(!privateStopRequested)exiting=false;}};
             try{form.Icon=new Icon(Path.Combine(ProgramDir,"icon.ico"));}catch{}
             var screen=Screen.PrimaryScreen.WorkingArea;form.Size=new Size(Math.Min(1320,screen.Width-30),Math.Min(880,screen.Height-30));mainForm=form;
             var shell=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Tag="canvas",Padding=new Padding(0),Margin=Padding.Empty};
@@ -46,7 +46,7 @@ namespace DouyinSpark
             actionsMenu.Items.Add("传统发送浏览器",null,delegate{ShowBrowserDialog();});
             actionsMenu.Items.Add("传统浏览器登录自检",null,delegate{DoLogin();});
             actionsMenu.Items.Add("导出历史 CSV",null,delegate{ExportHistory();});actionsMenu.Items.Add("清理旧历史",null,delegate{ClearHistory();});
-            add("设置","more",delegate{ShowWorkspace("设置");},false);
+            add("设置","settings",delegate{ShowWorkspace("设置");},false);
             themeButton=new RoundButton {Text=AppPalette.Dark?"浅色模式":"深色模式",IconName="moon",Navigation=true,Primary=false,Size=new Size(148,38),Margin=new Padding(0,0,0,6)};themeButton.Click+=delegate{ToggleAppearance();roster.Invalidate();};
             var update=new RoundButton {Text="检查更新",IconName="refresh",Navigation=true,Primary=false,Size=new Size(148,38)};update.Click+=delegate{DoCheckUpdate();};
             lblStatus=ViewLabel("就绪 · 数据保存在本机",8,false,true);lblStatus.Size=new Size(144,40);lblStatus.Margin=new Padding(4,8,0,0);
@@ -58,8 +58,8 @@ namespace DouyinSpark
             var todayTabs=new FlowLayoutPanel{Dock=DockStyle.Right,Width=206,WrapContents=false,Padding=new Padding(0,10,0,0),Tag="canvas"};todayPrivate=new RoundButton{Text="今日私信",Primary=false,Selected=true,Size=new Size(96,32),Font=AppPalette.Font(9)};todayGroups=new RoundButton{Text="今日群聊",Primary=false,Size=new Size(96,32),Font=AppPalette.Font(9)};todayPrivate.Click+=delegate{SetOverview(false);};todayGroups.Click+=delegate{SetOverview(true);};todayTabs.Controls.AddRange(new Control[]{todayPrivate,todayGroups});heading.Controls.Add(todayTabs);
             readiness=new ReadinessCard{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,6)};readiness.Click+=delegate{if(schedulePaused)ShowScheduleDialog();else if(GroupPaused)OpenGroupTask();else ShowEnvironment();RefreshEnvironmentBanner();};middle.Controls.Add(readiness,0,1);
             overview=new OverviewCard {Compact=true,Dock=DockStyle.Fill,Margin=new Padding(0,0,0,10)};
-            btnStart=new RoundButton {Text="发送全部私信",IconName="play",Primary=true,CornerRadius=16,Font=AppPalette.Font(10,true)};btnStart.Click+=delegate{DoStart();};btnStart.EnabledChanged+=delegate{btnStart.Text=btnStart.Enabled?"发送全部私信":"正在发送…";};overview.StartButton=btnStart;overview.Controls.Add(btnStart);middle.Controls.Add(overview,0,2);
-            btnGroup=new RoundButton{Text="群聊消息任务",IconName="chat",Primary=true,Font=AppPalette.Font(10,true),Visible=false,Bounds=btnStart.Bounds};btnGroup.Click+=delegate{OpenGroupTask();};overview.GroupButton=btnGroup;overview.Controls.Add(btnGroup);
+            btnStart=new RoundButton {Text="开始发送",IconName="play",Primary=true,CornerRadius=24,Font=AppPalette.Font(10,true)};btnStart.Click+=delegate{DoStart();};overview.StartButton=btnStart;overview.Controls.Add(btnStart);middle.Controls.Add(overview,0,2);
+            btnGroup=new RoundButton{Text="群聊消息任务",IconName="chat",Primary=true,Font=AppPalette.Font(10,true),Visible=false,Bounds=btnStart.Bounds};btnGroup.Click+=delegate{OpenGroupTask();};overview.GroupButton=btnGroup;overview.Controls.Add(btnGroup);btnStop=new RoundButton{Text="停止发送",Danger=true,IconName="",Primary=true,Enabled=false,CornerRadius=12,Font=AppPalette.Font(9,true)};btnStop.Click+=delegate{RequestStopSending();};overview.StopButton=btnStop;overview.Controls.Add(btnStop);overview.PerformLayout();
             progress=new SparkProgress {Dock=DockStyle.Fill,Margin=new Padding(0,2,0,8)};middle.Controls.Add(progress,0,3);
             var listCard=new CardSurface {Dock=DockStyle.Fill,Margin=Padding.Empty,Padding=new Padding(8,12,8,8)};
             var listLayout=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4};
@@ -91,7 +91,7 @@ namespace DouyinSpark
             dgv.CellFormatting+=delegate(object sender,DataGridViewCellFormattingEventArgs e){if(e.RowIndex>=0&&e.ColumnIndex>=0&&dgv.Columns[e.ColumnIndex].Name=="时间"){DateTime stamp;if(DateTime.TryParse(Convert.ToString(e.Value),out stamp)){e.Value=stamp.Date==DateTime.Today?stamp.ToString("HH:mm"):stamp.ToString("MM-dd");e.FormattingApplied=true;}}};
             emptyHistory=new EmptyHistory();tableBody.Controls.Add(dgv);tableBody.Controls.Add(emptyHistory);history.Controls.Add(tableBody);history.Controls.Add(hHead);right.Controls.Add(history,0,2);
             var run=new CardSurface {Dock=DockStyle.Fill,Margin=Padding.Empty,Padding=new Padding(12)};var runTitle=ViewLabel("运行动态",9,true);runTitle.Dock=DockStyle.Top;runTitle.Height=26;txtLog=new RichTextBox {Dock=DockStyle.Fill,ReadOnly=true,BorderStyle=BorderStyle.None,Font=AppPalette.Font(8),Tag="placeholder",Text="先导入会话，再核对消息。"};run.Controls.Add(txtLog);run.Controls.Add(runTitle);right.Controls.Add(run,0,3);
-            overviewTimer=new System.Windows.Forms.Timer {Interval=2000};overviewTimer.Tick+=delegate{if(form.Visible||!btnStart.Enabled){RefreshDashboard();if(!btnStart.Enabled)LoadLogs();}};overviewTimer.Start();form.Activated+=delegate{RefreshDashboard();};form.FormClosed+=delegate{overviewTimer.Dispose();actionsMenu.Dispose();};
+            overviewTimer=new System.Windows.Forms.Timer {Interval=1000};overviewTimer.Tick+=delegate{RefreshSendButtons();if(form.Visible||!btnStart.Enabled){RefreshDashboard();if(!btnStart.Enabled)LoadLogs();}};overviewTimer.Start();form.Activated+=delegate{RefreshDashboard();};form.FormClosed+=delegate{overviewTimer.Dispose();actionsMenu.Dispose();};
             tasksWorkspace=BuildTasksWorkspace();settingsWorkspace=BuildSettingsWorkspace();workspaceDeck.Controls.Add(tasksWorkspace);workspaceDeck.Controls.Add(settingsWorkspace);ShowWorkspace("联系人");
             AppPalette.Apply(form);RefreshDashboard();RefreshRoster();RefreshEnvironmentBanner();return form;
         }

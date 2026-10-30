@@ -9,11 +9,11 @@ namespace DouyinSpark
     static class AppPalette
     {
         public static bool Dark;
-        public static Color Canvas {get{return Dark?Color.FromArgb(24,30,40):Color.FromArgb(244,248,253);}}
+        public static Color Canvas {get{return Dark?Color.FromArgb(24,30,40):Color.FromArgb(255,249,250);}}
         public static Color Sidebar {get{return Dark?Color.FromArgb(29,37,50):Color.FromArgb(233,242,254);}}
         public static Color Surface {get{return Dark?Color.FromArgb(39,44,53):Color.White;}}
         public static Color Soft {get{return Dark?Color.FromArgb(46,59,78):Color.FromArgb(233,239,250);}}
-        public static Color Stripe {get{return Dark?Color.FromArgb(44,50,61):Color.FromArgb(248,250,253);}}
+        public static Color Stripe {get{return Dark?Color.FromArgb(44,50,61):Color.FromArgb(253,249,251);}}
         public static Color Accent {get{return Dark?Color.FromArgb(137,184,244):Color.FromArgb(62,123,218);}}
         public static Color AccentDeep {get{return Dark?Color.FromArgb(179,207,248):Color.FromArgb(42,99,190);}}
         public static Color Text {get{return Dark?Color.FromArgb(234,238,244):Color.FromArgb(34,44,59);}}
@@ -62,7 +62,7 @@ namespace DouyinSpark
             grid.DefaultCellStyle.BackColor=Surface;grid.DefaultCellStyle.ForeColor=Text;grid.DefaultCellStyle.SelectionBackColor=Soft;grid.DefaultCellStyle.SelectionForeColor=Text;
             grid.DefaultCellStyle.Font=Font(9);grid.DefaultCellStyle.Padding=new Padding(12,0,0,0);
             grid.RowsDefaultCellStyle.BackColor=Surface;grid.AlternatingRowsDefaultCellStyle.BackColor=Stripe;
-            grid.RowTemplate.Height=34;foreach(DataGridViewRow row in grid.Rows) row.Height=34;
+            int height=grid.Columns.Contains("pick")?44:34;grid.RowTemplate.Height=height;foreach(DataGridViewRow row in grid.Rows) row.Height=height;
         }
     }
 
@@ -104,6 +104,8 @@ namespace DouyinSpark
                 else if(name=="chat") {g.DrawRectangle(pen,3,4,18,13);g.DrawLines(pen,new[]{new Point(6,17),new Point(6,21),new Point(11,17)});g.DrawLine(pen,7,8,17,8);g.DrawLine(pen,7,12,14,12);}
                 else if(name=="more") {for(int i=0;i<3;i++)g.FillEllipse(brush,4+i*7,10,3,3);}
                 else if(name=="home") {g.DrawLines(pen,new[]{new Point(3,11),new Point(12,3),new Point(21,11)});g.DrawLines(pen,new[]{new Point(6,10),new Point(6,21),new Point(18,21),new Point(18,10)});g.DrawRectangle(pen,10,14,4,7);}
+                else if(name=="stop") g.FillRectangle(brush,6,6,12,12);
+                else if(name=="settings") {g.DrawEllipse(pen,5,5,14,14);g.DrawEllipse(pen,9,9,6,6);for(int i=0;i<8;i++){double a=i*Math.PI/4;g.DrawLine(pen,12+(float)Math.Cos(a)*8,12+(float)Math.Sin(a)*8,12+(float)Math.Cos(a)*11,12+(float)Math.Sin(a)*11);}}
                 else if(name=="play") g.FillPolygon(brush,new[]{new Point(7,4),new Point(20,12),new Point(7,20)});
                 else if(name=="moon") {g.DrawArc(pen,4,3,16,18,65,280);g.DrawArc(pen,9,1,14,15,75,145);}
                 else if(name=="download") {g.DrawLine(pen,12,3,12,15);g.DrawLines(pen,new[]{new Point(7,10),new Point(12,15),new Point(17,10)});g.DrawLines(pen,new[]{new Point(4,16),new Point(4,21),new Point(20,21),new Point(20,16)});}

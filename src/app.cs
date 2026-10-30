@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -22,7 +22,7 @@ namespace DouyinSpark
         static Label lblStatus;
         static SparkProgress progress;
         static string scheduleTime = "";     // 每日定时 "HH:mm"
-        const string AppVersion = "2.3.0";
+        const string AppVersion = "2.3.1";
 
         // HelloKitty 主题别名（Program 内直接使用）
         static readonly Color KPink = KittyTheme.KPink;
@@ -438,6 +438,7 @@ namespace DouyinSpark
 
         static void DoStart()
         {
+            if(SendCooling){Log("停止后的冷却中，请稍候再开始。");return;}
             if(groupTaskRunning){Log("群聊任务正在执行，私信定时会排队；手动发送请稍后重试。");return;}
             if(BrowserPath(GetBrowserChoice()).Length==0){Log("发送浏览器未找到，请先完成环境检查。");ShowEnvironment();return;}
             if(importingFollowing!=0) { Log("正在读取关注列表，定时/发送任务请等待导入结束后再试。"); return; }
@@ -448,68 +449,7 @@ namespace DouyinSpark
                 Log("发送被拦截：请先关闭抖音消息窗口");
                 return;
             }
-            btnStart.Enabled = false; Log("开始发送...");
-            progress.Reset();
-            progress.Done = 0; progress.Total = 0; progress.Info = "准备中..."; progress.Invalidate();
-            Log(FindBackend().Length>0 ? "使用独立后端" : "Python: "+PyExe);
-            var psi = BackendInfo(fixedMessage.Length>0 ? "--message "+QuoteArg(fixedMessage) : "");
-            try
-            {
-                var p = new Process(); p.StartInfo = psi; p.EnableRaisingEvents = true;
-                p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) {
-                    if (e.Data != null)
-                    {
-                        string d = e.Data;
-                        if(d.StartsWith("ATTENTION|"))
-                        {
-                            try { mainForm.BeginInvoke((Action)delegate { if(tray!=null) tray.ShowBalloonTip(10000,"需要人工处理",d.Split('|').Last(),ToolTipIcon.Warning); }); } catch { }
-                        }
-                        if (d.StartsWith("PROGRESS|"))
-                        {
-                            var parts = d.Split('|');
-                            if (parts.Length >= 5)
-                            {
-                                int dn, tt;
-                                if (int.TryParse(parts[1], out dn) && int.TryParse(parts[2], out tt) && tt > 0)
-                                {
-                                    string info = parts[3] + " " + (parts[4] == "OK" ? "\u2713" : "\u2717");
-                                    try { progress.Invoke(new Action(delegate { progress.Done = dn; progress.Total = tt; progress.Info = info; })); } catch { }
-                                }
-                            }
-                            return;
-                        }
-                        Log(d);
-                        try { SparkStorage.AppendLog(Path.Combine(BaseDir, "logs", "run_out.txt"), d + "\r\n"); } catch { }
-                    }
-                };
-                p.ErrorDataReceived += delegate(object s, DataReceivedEventArgs e) {
-                    if (e.Data != null)
-                    {
-                        Log("[!] " + e.Data);
-                        try { SparkStorage.AppendLog(Path.Combine(BaseDir, "logs", "run_err.txt"), e.Data + "\r\n"); } catch { }
-                    }
-                };
-                p.Exited += delegate
-                {
-                    Log("完成，退出码 " + p.ExitCode);
-                    try { progress.Invoke(new Action(delegate { progress.MarkFinished(p.ExitCode != 0); progress.Info = p.ExitCode == 0 ? "本轮处理结束" : "任务异常，请查看运行动态"; })); } catch { }
-                    try { btnStart.Invoke(new Action(delegate { btnStart.Enabled = true; })); } catch { }
-                    // LoadLogs 操作 dgv 控件，必须在 UI 线程执行
-                    try
-                    {
-                        if (mainForm != null && mainForm.IsHandleCreated && !mainForm.IsDisposed)
-                            mainForm.BeginInvoke((Action)delegate { LoadLogs(); });
-                    }
-                    catch { }
-                };
-                p.Start(); p.BeginOutputReadLine(); p.BeginErrorReadLine();
-                Log("已启动，日志文件: logs/run_out.txt");
-            }
-            catch (Exception ex)
-            {
-                Log("启动失败: " + ex.Message);
-                btnStart.Enabled = true;
-            }
+            StartPrivateRun();
         }
 
         static void SetUtf8Encoding(ProcessStartInfo psi)

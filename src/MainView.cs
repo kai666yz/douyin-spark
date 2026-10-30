@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -55,7 +55,7 @@ namespace DouyinSpark
                 overview.ModeText=fixedMessage.Length>0?"固定消息":"分类语录";
                 if(groupOverview){var attempts=GroupJournal.Read(BaseDir,DateTime.Now);overview.Summary=GroupSummary.Build(groupPlan.targets.Union(attempts.Select(x=>x.group_id)),attempts,DateTime.Now);overview.NextText=string.IsNullOrEmpty(groupPlan.schedule)?"尚未设置群聊定时":groupPlan.paused?"群聊定时已暂停":"群聊每日 · "+groupPlan.schedule;overview.ModeText="独立群聊消息";}
                 overview.AccessibleName="今日已处理 "+overview.Summary.Processed+" / "+overview.Summary.Total+"，成功 "+overview.Summary.Succeeded+"，失败 "+overview.Summary.Failed+"，待发 "+overview.Summary.Pending+"，待确认 "+overview.Summary.Unconfirmed+"。"+overview.NextText;
-                overview.Invalidate();RefreshRoster();RefreshTaskWorkspace();
+                overview.StateText=privateRunActive?(privateStopRequested?"等待当前联系人结束":"私信发送中"):groupTaskRunning?"群聊发送中":SendCooling?"停止冷却中":"准备就绪";overview.Busy=privateRunActive||groupTaskRunning;overview.Invalidate();RefreshRoster();RefreshTaskWorkspace();
             }
             catch(Exception){overview.NextText="记录正在更新…";overview.Invalidate();}
         }
@@ -80,7 +80,7 @@ namespace DouyinSpark
             string raw=Convert.ToString(e.Value),label="失败";Color foreground=AppPalette.Error,background=AppPalette.ErrorSoft;
             if(raw=="OK"){label="成功";foreground=AppPalette.Success;background=AppPalette.SuccessSoft;}
             else if(raw=="UNCONFIRMED" || raw=="CAPTCHA" || raw=="LOGIN_EXPIRED") {label=raw=="UNCONFIRMED"?"待确认":raw=="CAPTCHA"?"待验证":"需登录";foreground=AppPalette.Warning;background=AppPalette.WarningSoft;}
-            else if(raw=="CANCELLED" || raw=="STOPPED"){label="已停止";foreground=AppPalette.Muted;background=AppPalette.Soft;}
+            else if(raw=="CANCELLED" || raw=="STOPPED"){label="已取消";foreground=AppPalette.Muted;background=AppPalette.Soft;}
             e.PaintBackground(e.CellBounds,true);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
             var box=new RectangleF(e.CellBounds.X+4,e.CellBounds.Y+6,Math.Min(88,e.CellBounds.Width-8),22);
             using(var path=AppPalette.Round(box,11))using(var brush=new SolidBrush(background))e.Graphics.FillPath(brush,path);
